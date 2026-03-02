@@ -53,14 +53,22 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onBeforeUnmount } from 'vue';
 import { ElMessage } from 'element-plus';
 import { submitPoemTask, fetchTaskStatus } from '../services/api';
 
+type TaskItem = {
+  taskId: string;
+  status: string;
+  retrievedText: string;
+  enhancedPrompt: string;
+  resultImageUrl: string;
+};
+
 const poem = ref('');
 const submitting = ref(false);
-const tasks = ref<Array<Record<string, string>>>([]);
+const tasks = ref<TaskItem[]>([]);
 const pollingHandles = new Map<string, number>();
 const placeholder = 'https://via.placeholder.com/320x200?text=Awaiting+render';
 
@@ -100,20 +108,22 @@ const startPolling = (taskId: string) => {
     try {
       const statusResponse = await fetchTaskStatus(taskId);
       const payload = statusResponse.data?.data;
+      const statusValue = payload?.taskStatus ?? payload?.task_status;
+      const resolvedStatus = statusValue === 1 || statusValue === 'COMPLETED' ? 'COMPLETED' : statusValue === 2 || statusValue === 'FAILED' ? 'FAILED' : 'RUNNING';
       const taskIndex = (tasks.value ?? []).findIndex((t) => t.taskId === taskId);
       if (taskIndex === -1) {
         return;
       }
       const updatedTask = {
         ...tasks.value![taskIndex],
-        status: payload?.task_status === 1 ? 'COMPLETED' : 'RUNNING',
-        retrievedText: payload?.retrieved_text ?? '',
-        enhancedPrompt: payload?.enhanced_prompt ?? '',
-        resultImageUrl: payload?.result_image_url ?? ''
+        status: resolvedStatus,
+        retrievedText: payload?.retrievedText ?? payload?.retrieved_text ?? '',
+        enhancedPrompt: payload?.enhancedPrompt ?? payload?.enhanced_prompt ?? '',
+        resultImageUrl: payload?.resultImageUrl ?? payload?.result_image_url ?? ''
       };
       tasks.value = [...tasks.value!];
       tasks.value[taskIndex] = updatedTask;
-      if (payload?.task_status === 1 || payload?.task_status === 2) {
+      if (resolvedStatus === 'COMPLETED' || resolvedStatus === 'FAILED') {
         clearInterval(handle);
         pollingHandles.delete(taskId);
       }

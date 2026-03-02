@@ -1,8 +1,118 @@
+/* =============================================
+   Poetry RAG System — Dark Professional Theme
+   色调: 深灰 + 绿色调 (无蓝/紫)
+   ============================================= */
+
+:root {
+  /* 背景层级 */
+  --bg-base:      #0d0d0d;
+  --bg-sidebar:   #141414;
+  --bg-main:      #171717;
+  --bg-card:      #1e1e1e;
+  --bg-tertiary:  #252525;
+  --bg-hover:     rgba(255, 255, 255, 0.05);
+  --bg-active:    rgba(255, 255, 255, 0.08);
+
+  /* 主色调 - 绿色系 */
+  --accent:         #10a37f;
+  --accent-hover:   #0d8c6c;
+  --accent-subtle:  rgba(16, 163, 127, 0.1);
+  --accent-glow:    rgba(16, 163, 127, 0.25);
+
+  /* 文字 */
+  --text-primary:   #ececec;
+  --text-secondary: #a1a1a1;
+  --text-muted:     #666;
+
+  /* 边框 */
+  --border-color:   #2e2e2e;
+
+  /* 语义色 */
+  --danger:   #ef4444;
+  --warning:  #f59e0b;
+  --success:  #10a37f;
+
+  /* Element Plus 主题覆盖 */
+  --el-color-primary:          #10a37f;
+  --el-color-primary-light-3:  #3db897;
+  --el-color-primary-light-5:  #6bcbaf;
+  --el-color-primary-light-7:  #9addc8;
+  --el-color-primary-light-8:  #b3e7d6;
+  --el-color-primary-light-9:  #ccf1e5;
+  --el-color-primary-dark-2:   #0d8266;
+
+  --el-bg-color:               #1e1e1e;
+  --el-bg-color-overlay:       #252525;
+  --el-bg-color-page:          #171717;
+  --el-text-color-primary:     #ececec;
+  --el-text-color-regular:     #ccc;
+  --el-text-color-secondary:   #a1a1a1;
+  --el-text-color-placeholder: #666;
+  --el-border-color:           #2e2e2e;
+  --el-border-color-light:     #2a2a2a;
+  --el-border-color-lighter:   #252525;
+  --el-fill-color-blank:       #1e1e1e;
+  --el-fill-color:             #252525;
+  --el-fill-color-light:       #2a2a2a;
+  --el-mask-color:             rgba(0, 0, 0, 0.7);
+}
+
 * {
   box-sizing: border-box;
 }
-body {
+
+html, body {
   margin: 0;
-  font-family: 'Inter', 'PingFang SC', 'Noto Sans SC', sans-serif;
-  background: #f8f3e8;
+  padding: 0;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 全局滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Element Plus 深色修正 */
+.el-message {
+  --el-message-bg-color: #252525 !important;
+  --el-message-border-color: #2e2e2e !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.el-input__wrapper {
+  background-color: var(--bg-card) !important;
+  box-shadow: 0 0 0 1px var(--border-color) inset !important;
+}
+
+.el-textarea__inner {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--accent) !important;
+  --el-button-border-color: var(--accent) !important;
+  --el-button-hover-bg-color: var(--accent-hover) !important;
+  --el-button-hover-border-color: var(--accent-hover) !important;
+}
+
+.el-card {
+  --el-card-bg-color: var(--bg-card);
+  --el-card-border-color: var(--border-color);
+  color: var(--text-primary);
 }

@@ -1,45 +1,33 @@
 <template>
-  <div class="app-shell">
-    <header class="hero">
-      <div>
-        <p class="eyebrow">Poetry RAG Visualizer</p>
-        <h1>Transform classical verses into evocative scenes.</h1>
-        <p class="lede">
-          Enter a classical poem and follow the RAG-enhanced task through retrieval, prompt enrichment, and final
-          image generation.
-        </p>
-      </div>
-    </header>
-    <main>
-      <RAGFlow />
+  <div class="app-layout" :class="{ 'no-sidebar': !showSidebar }">
+    <AppSidebar v-if="showSidebar" />
+    <main class="app-main" :class="{ 'full-main': !showSidebar }">
+      <router-view />
     </main>
   </div>
 </template>
 
-<script setup>
-import RAGFlow from './components/RAGFlow.vue';
+<script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import AppSidebar from './components/AppSidebar.vue'
+
+const route = useRoute()
+const showSidebar = computed(() => route.path !== '/login')
 </script>
 
 <style scoped>
-.app-shell {
+.app-layout {
+  display: flex;
   min-height: 100vh;
-  background: radial-gradient(circle at top, #f8f3e8, #f3f0fc);
-  color: #1e1e1e;
+  background: var(--bg-main);
 }
-.hero {
-  padding: 3rem clamp(1.5rem, 5vw, 4rem);
+.app-main {
+  flex: 1;
+  margin-left: 260px;
+  min-height: 100vh;
 }
-.eyebrow {
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  font-size: 0.85rem;
-  color: #a8641c;
-}
-.lede {
-  max-width: 50ch;
-  line-height: 1.7;
-}
-main {
-  padding: 2rem clamp(1rem, 4vw, 3rem);
+.app-main.full-main {
+  margin-left: 0;
 }
 </style>

@@ -5,14 +5,26 @@ spring:
   application:
     name: poetry-rag-backend
   datasource:
-    url: jdbc:mysql://localhost:3306/poetry_rag?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/poetry_rag?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
     username: root
-    password: password
+    password: 1401934635      # 本机 MySQL 密码
     driver-class-name: com.mysql.cj.jdbc.Driver
   jackson:
     serialization:
       write-dates-as-timestamps: false
+    default-property-inclusion: non_null   # JSON 响应自动忽略 null 字段
 
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true                              # 下划线 → 驼峰自动映射
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl           # 开发期打印 SQL，上线可删
+  global-config:
+    db-config:
+      id-type: auto
+      table-underline: true
+
+# AI 微服务地址
 ai:
   service:
-    url: http://localhost:8000/ai/api/v1/generate/async
+    url: http://127.0.0.1:8000/ai/api/v1/generate/async

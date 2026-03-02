@@ -1,0 +1,9 @@
+{
+  "properties": [
+    {
+      "name": "ai.service.url",
+      "type": "java.lang.String",
+      "description": "AI async generation endpoint URL."
+    }
+  ]
+}

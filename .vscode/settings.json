@@ -1,3 +1,8 @@
 {
+  "python.defaultInterpreterPath": "N:/visual stdio 3/Python39_64/python.exe",
+  "python.analysis.extraPaths": [
+    "./ai-service"
+  ]
+}{
     "java.compile.nullAnalysis.mode": "automatic"
 }

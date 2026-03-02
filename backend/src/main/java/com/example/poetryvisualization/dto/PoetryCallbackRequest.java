@@ -3,6 +3,7 @@ package com.example.poetryvisualization.dto;
 public class PoetryCallbackRequest {
   private String taskId;
   private Integer status;
+  private String errorMessage;
   private CallbackPayload payload;
 
   public String getTaskId() {
@@ -19,6 +20,14 @@ public class PoetryCallbackRequest {
 
   public void setStatus(Integer status) {
     this.status = status;
+  }
+
+  public String getErrorMessage() {
+    return errorMessage;
+  }
+
+  public void setErrorMessage(String errorMessage) {
+    this.errorMessage = errorMessage;
   }
 
   public CallbackPayload getPayload() {
