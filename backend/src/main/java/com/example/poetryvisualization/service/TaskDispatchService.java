@@ -1,23 +1,15 @@
 package com.example.poetryvisualization.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.poetryvisualization.config.AiServiceProperties;
 import com.example.poetryvisualization.dto.PoetryCallbackRequest;
 import com.example.poetryvisualization.entity.GenerationTask;
 import com.example.poetryvisualization.mapper.GenerationTaskMapper;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -27,18 +19,16 @@ public class TaskDispatchService {
   private static final Logger log = LoggerFactory.getLogger(TaskDispatchService.class);
 
   private final GenerationTaskMapper taskMapper;
-  private final RestTemplate restTemplate;
   private final String aiServiceUrl;
-  private final ObjectMapper objectMapper;
+  private final String callbackUrl;
+  private final String callbackToken;
 
   public TaskDispatchService(GenerationTaskMapper taskMapper,
-                             RestTemplateBuilder restTemplateBuilder,
-                             AiServiceProperties aiServiceProperties,
-                             ObjectMapper objectMapper) {
+                             AiServiceProperties aiServiceProperties) {
     this.taskMapper = taskMapper;
-    this.restTemplate = restTemplateBuilder.build();
     this.aiServiceUrl = Objects.requireNonNull(aiServiceProperties.getUrl(), "ai.service.url must not be null");
-    this.objectMapper = objectMapper;
+    this.callbackUrl = Objects.requireNonNull(aiServiceProperties.getCallbackUrl(), "ai.service.callback-url must not be null");
+    this.callbackToken = Objects.requireNonNull(aiServiceProperties.getCallbackToken(), "ai.service.callback-token must not be null");
   }
 
   /** 创建任务 → 持久化到 MySQL → 异步派发到 AI 微服务 */
@@ -67,6 +57,9 @@ public class TaskDispatchService {
   public GenerationTask updateFromCallback(PoetryCallbackRequest request) {
     GenerationTask task = findByTaskId(request.getTaskId());
     if (request.getStatus() != null && request.getStatus() == GenerationTask.STATUS_COMPLETED) {
+      if (request.getPayload() == null) {
+        throw new IllegalArgumentException("Callback payload is required for completed task");
+      }
       task.setTaskStatus(GenerationTask.STATUS_COMPLETED);
       task.setErrorMessage(null);
     } else {
@@ -94,16 +87,38 @@ public class TaskDispatchService {
     return task;
   }
 
-  /** 向 AI 微服务派发生成请求 */
+  /** 向 AI 微服务派发生成请求（使用 Java 内置 HttpClient，避免 RestTemplate 编码问题） */
   private void dispatchToAi(GenerationTask task) throws Exception {
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_JSON);
-    Map<String, String> payload = new HashMap<>();
-    payload.put("taskId", task.getTaskId());
-    payload.put("sourceText", task.getOriginalPoem());
-    payload.put("callbackUrl", "http://127.0.0.1:8080/api/v1/poetry/callback");
-    String jsonPayload = objectMapper.writeValueAsString(payload);
-    HttpEntity<String> entity = new HttpEntity<>(jsonPayload, headers);
-    restTemplate.postForEntity(aiServiceUrl, entity, String.class);
+    String json = String.format(
+        "{\"taskId\":\"%s\",\"sourceText\":\"%s\",\"callbackUrl\":\"%s\",\"callbackToken\":\"%s\"}",
+        escapeJson(task.getTaskId()),
+        escapeJson(task.getOriginalPoem()),
+        escapeJson(callbackUrl),
+        escapeJson(callbackToken)
+    );
+    log.info("Dispatching task {} to AI: url={}, body={}", task.getTaskId(), aiServiceUrl, json);
+    java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+        .version(java.net.http.HttpClient.Version.HTTP_1_1)
+        .connectTimeout(java.time.Duration.ofSeconds(10))
+        .build();
+    java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+        .uri(java.net.URI.create(aiServiceUrl))
+        .header("Content-Type", "application/json; charset=UTF-8")
+        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(json, java.nio.charset.StandardCharsets.UTF_8))
+        .timeout(java.time.Duration.ofSeconds(15))
+        .build();
+    java.net.http.HttpResponse<String> response = client.send(
+        request, java.net.http.HttpResponse.BodyHandlers.ofString(java.nio.charset.StandardCharsets.UTF_8));
+    log.info("AI service responded: status={} body={}", response.statusCode(), response.body());
+    if (response.statusCode() >= 400) {
+        throw new RuntimeException(
+            String.format("%d on POST to AI: %s", response.statusCode(), response.body()));
+    }
+  }
+
+  private static String escapeJson(String value) {
+    if (value == null) return "";
+    return value.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
   }
 }

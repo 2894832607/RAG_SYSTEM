@@ -54,11 +54,11 @@ export const useTaskStore = defineStore('task', () => {
       try {
         const res = await fetchTaskStatus(taskId)
         const payload = res.data?.data
-        const statusValue = payload?.taskStatus ?? payload?.task_status
+        const statusValue = payload?.taskStatus
         const resolvedStatus =
-          statusValue === 1 || statusValue === 'COMPLETED'
+          statusValue === 1
             ? 'COMPLETED'
-            : statusValue === 2 || statusValue === 'FAILED'
+            : statusValue === 2
               ? 'FAILED'
               : 'RUNNING'
 
@@ -68,10 +68,10 @@ export const useTaskStore = defineStore('task', () => {
         tasks.value[idx] = {
           ...tasks.value[idx],
           status: resolvedStatus,
-          retrievedText: payload?.retrievedText ?? payload?.retrieved_text ?? '',
-          enhancedPrompt: payload?.enhancedPrompt ?? payload?.enhanced_prompt ?? '',
-          resultImageUrl: payload?.resultImageUrl ?? payload?.result_image_url ?? '',
-          errorMessage: payload?.errorMessage ?? payload?.error_message ?? ''
+          retrievedText: payload?.retrievedText ?? '',
+          enhancedPrompt: payload?.enhancedPrompt ?? '',
+          resultImageUrl: payload?.resultImageUrl ?? '',
+          errorMessage: payload?.errorMessage ?? ''
         }
 
         if (currentTask.value?.taskId === taskId) {
@@ -101,5 +101,10 @@ export const useTaskStore = defineStore('task', () => {
     pollingHandles.clear()
   }
 
-  return { tasks, currentTask, submitting, addTask, selectTask, clearPolling }
+  /** 清除当前选中任务（回到欢迎页） */
+  const clearCurrentTask = () => {
+    currentTask.value = null
+  }
+
+  return { tasks, currentTask, submitting, addTask, selectTask, clearPolling, clearCurrentTask }
 })

@@ -1,9 +1,18 @@
 package com.example.poetryvisualization.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 public class PoetryCallbackRequest {
+  @NotBlank(message = "taskId 不能为空")
   private String taskId;
+
+  @NotNull(message = "status 不能为空")
   private Integer status;
   private String errorMessage;
+
+  @Valid
   private CallbackPayload payload;
 
   public String getTaskId() {
@@ -39,8 +48,13 @@ public class PoetryCallbackRequest {
   }
 
   public static class CallbackPayload {
+    @NotBlank(message = "retrievedText 不能为空")
     private String retrievedText;
+
+    @NotBlank(message = "enhancedPrompt 不能为空")
     private String enhancedPrompt;
+
+    @NotBlank(message = "imageUrl 不能为空")
     private String imageUrl;
 
     public String getRetrievedText() {

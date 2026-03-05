@@ -34,7 +34,7 @@
       </button>
 
       <div class="tips" v-if="!isRegisterMode">
-        测试账号：admin / 123456
+        若首次使用，请先注册账号再登录
       </div>
     </div>
   </div>
@@ -65,7 +65,20 @@ const switchMode = (registerMode: boolean) => {
 
 const getErrorMessage = (error: unknown): string => {
   const axiosError = error as AxiosError<{ message?: string }>
-  return axiosError.response?.data?.message || '请求失败，请稍后重试'
+  const status = axiosError.response?.status
+  if (axiosError.response?.data?.message) {
+    return axiosError.response.data.message
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return '后端服务暂不可用，请确认 http://127.0.0.1:8080 已成功启动'
+  }
+  if (status && status >= 500) {
+    return '后端服务异常，请查看后端启动窗口日志'
+  }
+  if (axiosError.code === 'ERR_NETWORK') {
+    return '网络请求失败，请确认后端服务 http://127.0.0.1:8080 已启动'
+  }
+  return '请求失败，请稍后重试'
 }
 
 const handleSubmit = async () => {

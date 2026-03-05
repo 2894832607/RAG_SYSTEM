@@ -11,16 +11,17 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class AuthService {
 
     private final UserMapper userMapper;
+    private final TokenService tokenService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public AuthService(UserMapper userMapper) {
+    public AuthService(UserMapper userMapper, TokenService tokenService) {
         this.userMapper = userMapper;
+        this.tokenService = tokenService;
     }
 
     public Map<String, Object> register(RegisterRequest request) {
@@ -47,7 +48,7 @@ public class AuthService {
         userInfo.put("nickname", user.getNickname());
 
         Map<String, Object> data = new HashMap<>();
-        data.put("token", UUID.randomUUID().toString().replace("-", ""));
+        data.put("token", tokenService.issueToken(user.getId()));
         data.put("user", userInfo);
         return data;
     }
@@ -71,7 +72,7 @@ public class AuthService {
         userInfo.put("nickname", user.getNickname());
 
         Map<String, Object> data = new HashMap<>();
-        data.put("token", UUID.randomUUID().toString().replace("-", ""));
+        data.put("token", tokenService.issueToken(user.getId()));
         data.put("user", userInfo);
         return data;
     }

@@ -1,0 +1,5 @@
+# Copy this file to local-env.ps1 and fill your own values.
+$env:GLM_API_KEY = 'your_glm_api_key_here'
+$env:GLM_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
+$env:GLM_MODEL = 'glm-5'
+$env:GLM_TIMEOUT = '90'

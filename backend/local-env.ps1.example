@@ -1,0 +1,9 @@
+# Copy this file to local-env.ps1 and fill your own values.
+$env:DB_URL = 'jdbc:mysql://127.0.0.1:3306/poetry_rag?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai'
+$env:DB_USERNAME = 'root'
+$env:DB_PASSWORD = 'your_mysql_password_here'
+
+# Optional
+$env:AI_SERVICE_URL = 'http://127.0.0.1:8000/ai/api/v1/generate/async'
+$env:AI_CALLBACK_URL = 'http://127.0.0.1:8080/api/v1/poetry/callback'
+$env:AI_CALLBACK_TOKEN = 'poetry-callback-token-change-me'

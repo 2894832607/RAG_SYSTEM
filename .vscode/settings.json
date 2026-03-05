@@ -1,8 +1,29 @@
 {
-  "python.defaultInterpreterPath": "N:/visual stdio 3/Python39_64/python.exe",
-  "python.analysis.extraPaths": [
-    "./ai-service"
-  ]
-}{
-    "java.compile.nullAnalysis.mode": "automatic"
+    "python.defaultInterpreterPath": "N:/visual stdio 3/Python39_64/python.exe",
+    "python.analysis.extraPaths": [
+        "./ai-service"
+    ],
+    "java.compile.nullAnalysis.mode": "automatic",
+    "chat.tools.global.autoApprove": true,
+    "chat.tools.terminal.enableAutoApprove": true,
+    "chat.tools.terminal.autoApprove": {
+        "/^D:/aaa111/Poetry-RAG-System/\\.venv/Scripts/python\\.exe -W ignore -c \"import sys; sys\\.path\\.insert\\(0,'ai-service'\\); from app\\.main import app; routes=\\[r\\.path for r in app\\.routes\\]; print\\('OK routes:',routes\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd D:\\\\aaa111\\\\Poetry-RAG-System\\\\ai-service ; \\$env:PYTHONPATH=\"\\.\" ; D:/aaa111/Poetry-RAG-System/\\.venv/Scripts/python\\.exe -m uvicorn app\\.main:app --host 0\\.0\\.0\\.0 --port 8000 --reload$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        ".specify/scripts/bash/": true,
+        ".specify/scripts/powershell/": true
+    },
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "chat.promptFilesRecommendations": {
+        "speckit.constitution": true,
+        "speckit.specify": true,
+        "speckit.plan": true,
+        "speckit.tasks": true,
+        "speckit.implement": true
+    }
 }

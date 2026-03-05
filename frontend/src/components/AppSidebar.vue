@@ -3,23 +3,26 @@
     <!-- Brand -->
     <div class="sidebar-brand">
       <div class="brand-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z" />
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M3 17c3-3 5-8 9-8s6 5 9 8" stroke-linecap="round"/>
+          <path d="M3 12c2-3 4-6 9-6s7 3 9 6" stroke-linecap="round"/>
+          <path d="M12 21v-3" stroke-linecap="round"/>
         </svg>
       </div>
       <div class="brand-text">
-        <span class="brand-name">Poetry RAG</span>
-        <span class="brand-sub">诗词意境可视化</span>
+        <span class="brand-name">诗词意境</span>
+        <span class="brand-sub">Poetry RAG Agent</span>
       </div>
     </div>
 
-    <!-- New Task Button -->
-    <button class="new-task-btn" @click="$router.push('/')">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="5" x2="12" y2="19" />
-        <line x1="5" y1="12" x2="19" y2="12" />
+    <!-- New Chat Button -->
+    <button class="new-task-btn" @click="handleNewChat">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        <line x1="12" y1="8" x2="12" y2="14"/>
+        <line x1="9" y1="11" x2="15" y2="11"/>
       </svg>
-      新建生成
+      新对话
     </button>
 
     <!-- Navigation -->
@@ -42,9 +45,9 @@
       </router-link>
     </nav>
 
-    <!-- Recent Tasks -->
+    <!-- Recent Chats -->
     <div class="sidebar-section" v-if="taskStore.tasks.length > 0">
-      <div class="section-label">最近任务</div>
+      <div class="section-label">对话历史</div>
       <div class="recent-list">
         <div
           v-for="task in recentTasks"
@@ -86,7 +89,7 @@ const taskStore = useTaskStore()
 const authStore = useAuthStore()
 const router = useRouter()
 
-const recentTasks = computed(() => taskStore.tasks.slice(0, 8))
+const recentTasks = computed(() => taskStore.tasks.slice(0, 12))
 
 const truncate = (text: string, max: number) =>
   text.length > max ? text.slice(0, max) + '…' : text
@@ -99,6 +102,10 @@ const statusClass = (status: string) => ({
 
 const handleSelectTask = (taskId: string) => {
   taskStore.selectTask(taskId)
+  router.push('/')
+}
+
+const handleNewChat = () => {
   router.push('/')
 }
 
@@ -138,14 +145,15 @@ const handleLogout = async () => {
   padding: 20px 20px 16px;
 }
 .brand-icon {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 10px;
-  background: var(--accent);
+  background: var(--accent-subtle);
+  border: 1px solid rgba(201, 168, 76, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--accent);
   flex-shrink: 0;
 }
 .brand-text {

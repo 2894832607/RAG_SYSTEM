@@ -1,13 +1,13 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: poetry-rag-backend
   datasource:
-    url: jdbc:mysql://localhost:3306/poetry_rag?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: 1401934635      # 本机 MySQL 密码
+    url: ${DB_URL:jdbc:mysql://localhost:3306/poetry_rag?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
   jackson:
     serialization:
@@ -27,4 +27,13 @@ mybatis-plus:
 # AI 微服务地址
 ai:
   service:
-    url: http://127.0.0.1:8000/ai/api/v1/generate/async
+    url: ${AI_SERVICE_URL:http://127.0.0.1:8000/ai/api/v1/generate/async}
+    callback-url: ${AI_CALLBACK_URL:http://127.0.0.1:${server.port}/api/v1/poetry/callback}
+    callback-token: ${AI_CALLBACK_TOKEN:poetry-callback-token-change-me}
+
+app:
+  security:
+    token-ttl-minutes: ${AUTH_TOKEN_TTL_MINUTES:720}
+    cors:
+      allowed-origins:
+        - ${WEB_ORIGIN:http://localhost:5173}

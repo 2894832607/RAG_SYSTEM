@@ -1,60 +1,60 @@
 /* =============================================
-   Poetry RAG System — Dark Professional Theme
-   色调: 深灰 + 绿色调 (无蓝/紫)
+   Poetry RAG System — Ink & Paper Dark Theme
+   色调: 深墨色底 + 琥珀金主色 (文人水墨风)
    ============================================= */
 
 :root {
-  /* 背景层级 */
-  --bg-base:      #0d0d0d;
-  --bg-sidebar:   #141414;
-  --bg-main:      #171717;
-  --bg-card:      #1e1e1e;
-  --bg-tertiary:  #252525;
-  --bg-hover:     rgba(255, 255, 255, 0.05);
-  --bg-active:    rgba(255, 255, 255, 0.08);
+  /* 背景层级 — 微暖墨色 */
+  --bg-base:      #0b0a08;
+  --bg-sidebar:   #111009;
+  --bg-main:      #14120f;
+  --bg-card:      #1b1914;
+  --bg-tertiary:  #222018;
+  --bg-hover:     rgba(255, 248, 230, 0.04);
+  --bg-active:    rgba(255, 248, 230, 0.07);
 
-  /* 主色调 - 绿色系 */
-  --accent:         #10a37f;
-  --accent-hover:   #0d8c6c;
-  --accent-subtle:  rgba(16, 163, 127, 0.1);
-  --accent-glow:    rgba(16, 163, 127, 0.25);
+  /* 主色调 — 琥珀金 (宣纸·印泥色) */
+  --accent:         #c9a84c;
+  --accent-hover:   #b8913f;
+  --accent-subtle:  rgba(201, 168, 76, 0.10);
+  --accent-glow:    rgba(201, 168, 76, 0.22);
 
   /* 文字 */
-  --text-primary:   #ececec;
-  --text-secondary: #a1a1a1;
-  --text-muted:     #666;
+  --text-primary:   #e8e2d4;
+  --text-secondary: #9a9180;
+  --text-muted:     #5a5346;
 
   /* 边框 */
-  --border-color:   #2e2e2e;
+  --border-color:   #2b2820;
 
   /* 语义色 */
-  --danger:   #ef4444;
-  --warning:  #f59e0b;
-  --success:  #10a37f;
+  --danger:   #c0392b;
+  --warning:  #d4843e;
+  --success:  #7ab648;
 
   /* Element Plus 主题覆盖 */
-  --el-color-primary:          #10a37f;
-  --el-color-primary-light-3:  #3db897;
-  --el-color-primary-light-5:  #6bcbaf;
-  --el-color-primary-light-7:  #9addc8;
-  --el-color-primary-light-8:  #b3e7d6;
-  --el-color-primary-light-9:  #ccf1e5;
-  --el-color-primary-dark-2:   #0d8266;
+  --el-color-primary:          #c9a84c;
+  --el-color-primary-light-3:  #d4b870;
+  --el-color-primary-light-5:  #dec890;
+  --el-color-primary-light-7:  #e9d8b0;
+  --el-color-primary-light-8:  #efe2c4;
+  --el-color-primary-light-9:  #f5edd8;
+  --el-color-primary-dark-2:   #b8913f;
 
-  --el-bg-color:               #1e1e1e;
-  --el-bg-color-overlay:       #252525;
-  --el-bg-color-page:          #171717;
-  --el-text-color-primary:     #ececec;
-  --el-text-color-regular:     #ccc;
-  --el-text-color-secondary:   #a1a1a1;
-  --el-text-color-placeholder: #666;
-  --el-border-color:           #2e2e2e;
-  --el-border-color-light:     #2a2a2a;
-  --el-border-color-lighter:   #252525;
-  --el-fill-color-blank:       #1e1e1e;
-  --el-fill-color:             #252525;
-  --el-fill-color-light:       #2a2a2a;
-  --el-mask-color:             rgba(0, 0, 0, 0.7);
+  --el-bg-color:               #1b1914;
+  --el-bg-color-overlay:       #222018;
+  --el-bg-color-page:          #14120f;
+  --el-text-color-primary:     #e8e2d4;
+  --el-text-color-regular:     #ccc5b4;
+  --el-text-color-secondary:   #9a9180;
+  --el-text-color-placeholder: #5a5346;
+  --el-border-color:           #2b2820;
+  --el-border-color-light:     #262420;
+  --el-border-color-lighter:   #222018;
+  --el-fill-color-blank:       #1b1914;
+  --el-fill-color:             #222018;
+  --el-fill-color-light:       #262420;
+  --el-mask-color:             rgba(0, 0, 0, 0.72);
 }
 
 * {

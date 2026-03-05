@@ -31,3 +31,5 @@ target/
 # Env files
 .env
 .env.*
+backend/local-env.ps1
+ai-service/local-env.ps1

@@ -9,7 +9,7 @@
       >
         <div class="step-indicator">
           <!-- Completed -->
-          <svg v-if="isCompleted(i)" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
+          <svg v-if="isCompleted(i)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5">
             <polyline points="20,6 9,17 4,12" />
           </svg>
           <!-- Running spinner -->
@@ -66,12 +66,12 @@ const stepClass = (i: number) => ({
 
 <style scoped>
 .pipeline {
-  padding: 24px 0 8px;
+  padding: 4px 0 2px;
 }
 .pipeline-track {
   display: flex;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 0;
 }
 .pipeline-step {
@@ -80,14 +80,14 @@ const stepClass = (i: number) => ({
   align-items: center;
   position: relative;
   flex: 1;
-  max-width: 160px;
+  max-width: 120px;
 }
 .step-indicator {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: var(--bg-tertiary);
-  border: 2px solid var(--border-color);
+  border: 1.5px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,47 +105,46 @@ const stepClass = (i: number) => ({
 }
 .pipeline-step.failed .step-indicator {
   border-color: var(--danger);
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(192, 57, 43, 0.1);
 }
 .step-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--text-muted);
 }
 .step-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--accent);
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--accent);
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 .step-label {
-  margin-top: 10px;
-  font-size: 12.5px;
+  margin-top: 8px;
+  font-size: 11.5px;
   color: var(--text-muted);
   white-space: nowrap;
   transition: color 0.2s;
+  letter-spacing: 0.02em;
 }
 .pipeline-step.completed .step-label,
 .pipeline-step.active .step-label {
-  color: var(--text-primary);
+  color: var(--text-secondary);
 }
 
-/* Connector lines between steps */
+/* Connector lines */
 .step-connector {
   position: absolute;
-  top: 18px;
-  left: calc(50% + 22px);
-  width: calc(100% - 44px);
-  height: 2px;
+  top: 15px;
+  left: calc(50% + 18px);
+  width: calc(100% - 36px);
+  height: 1.5px;
   background: var(--border-color);
   z-index: 1;
-  transition: background 0.3s;
+  transition: background 0.4s;
 }
 .step-connector.filled {
   background: var(--accent);

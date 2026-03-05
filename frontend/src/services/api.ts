@@ -49,7 +49,3 @@ export function submitPoemTask(poemText: string) {
 export function fetchTaskStatus(taskId: string) {
   return gateway.get(`/poetry/task/${taskId}`);
 }
-
-export function fetchCallbackPayload(taskId: string) {
-  return gateway.get(`/poetry/callback/${taskId}`);
-}
