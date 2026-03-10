@@ -1,0 +1,189 @@
+openapi: 3.1.0
+info:
+  title: Poetry RAG — AI Service API
+  version: "0.2.0"
+  description: |
+    FastAPI AI 微服务对外暴露的接口。
+    内部集成 LangGraph Agent、GLM-4/5、ChromaDB 向量检索。
+    对外提供异步生成、同步冒烟测试、GLM 思考流 SSE 三类接口。
+
+servers:
+  - url: http://localhost:8000
+    description: 本地开发
+
+tags:
+  - name: generate
+    description: 诗词图像生成（核心流水线）
+  - name: mock
+    description: 本地调试 mock 接口
+
+paths:
+  # ── 异步生成（主流程）──────────────────────────────────────────────────────
+  /ai/api/v1/generate/async:
+    post:
+      summary: 异步启动 RAG 生成管道
+      operationId: queueGeneration
+      tags: [generate]
+      description: |
+        接收任务信息后立即返回 202，
+        在后台执行 RAG 检索 → Prompt 增强 → 图像生成，
+        完成后以 `POST callbackUrl` 回调 Backend。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenerationRequest'
+            example:
+              taskId: "abc123-uuid"
+              sourceText: "床前明月光，疑是地上霜"
+              callbackUrl: "http://backend:8080/api/v1/poetry/callback"
+              callbackToken: "poetry-callback-token-change-me"
+      responses:
+        "202":
+          description: 任务已接受，后台处理中
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Task accepted"
+                  taskId:
+                    type: string
+
+  # ── 同步简单生成（冒烟测试）───────────────────────────────────────────────
+  /ai/api/v1/generate/simple:
+    post:
+      summary: 同步生成（本地冒烟用，无回调）
+      operationId: simpleGeneration
+      tags: [generate]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleGenerationRequest'
+      responses:
+        "200":
+          description: 生成结果（同步返回）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleGenerationResponse'
+
+  # ── GLM 思考流 SSE ────────────────────────────────────────────────────────
+  /ai/api/v1/generate/think-stream:
+    post:
+      summary: GLM 推理过程 SSE 流
+      operationId: thinkStream
+      tags: [generate]
+      description: |
+        逐 token 推送 GLM 的 `reasoning_content`。
+        适合前端实时展示"思考过程"。
+        每个 SSE 事件格式：`data: {"text":"..."}`
+        结束标记：`data: [DONE]`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleGenerationRequest'
+      responses:
+        "200":
+          description: Server-Sent Events 流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  # ── Mock 调试接口 ─────────────────────────────────────────────────────────
+  /ai/api/v1/mock/callback/{taskId}:
+    get:
+      summary: 查询本地 mock 回调记录（调试用）
+      operationId: getMockCallback
+      tags: [mock]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 该 taskId 最近一条回调记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallbackBody'
+        "404":
+          description: 无记录
+
+# ── Components ──────────────────────────────────────────────────────────────
+components:
+  schemas:
+    GenerationRequest:
+      type: object
+      required: [taskId, sourceText, callbackUrl, callbackToken]
+      properties:
+        taskId:
+          type: string
+          description: Backend 分配的任务 ID
+        sourceText:
+          type: string
+          description: 原始诗句文本
+        callbackUrl:
+          type: string
+          format: uri
+          description: 完成后 POST 回调的地址
+        callbackToken:
+          type: string
+          description: 回调鉴权 token，放入 X-Callback-Token 头
+
+    SimpleGenerationRequest:
+      type: object
+      required: [sourceText]
+      properties:
+        sourceText:
+          type: string
+          description: 原始诗句文本
+
+    SimpleGenerationResponse:
+      type: object
+      properties:
+        retrievedText:
+          type: string
+          description: RAG 检索到的相关语料
+        enhancedPrompt:
+          type: string
+          description: 增强后的图像生成 Prompt
+        imageUrl:
+          type: string
+          format: uri
+          description: 生成图像的访问 URL
+
+    CallbackBody:
+      type: object
+      required: [taskId, status]
+      properties:
+        taskId:
+          type: string
+        status:
+          type: integer
+          enum: [1, 2]
+          description: "1=成功  2=失败"
+        errorMessage:
+          type: string
+          nullable: true
+        payload:
+          nullable: true
+          type: object
+          properties:
+            retrievedText:
+              type: string
+            enhancedPrompt:
+              type: string
+            imageUrl:
+              type: string
+              format: uri

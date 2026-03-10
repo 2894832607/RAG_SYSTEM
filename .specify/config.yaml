@@ -1,0 +1,4 @@
+default_language: zh-CN  # 全局默认语言：中文
+output_format: markdown  # 输出格式
+template:
+  spec: "custom-chinese-spec-template.md"  # 自定义中文模板

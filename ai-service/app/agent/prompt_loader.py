@@ -22,7 +22,7 @@ prompt_loader.py — Prompt 文件加载器
 
 注意：
     - .md 文件中以 `# ` 开头的注释行（首部元数据段）会被自动剥离
-    - 变量插值使用 Python str.format_map()，{变量名} 语法
+    - 变量插值使用正则替换（仅替换 {ASCII标识符} 形式的占位符），其余 {} 原样保留
     - 文件不存在时抛出 FileNotFoundError（不静默，方便调试）
 """
 from __future__ import annotations
@@ -61,23 +61,22 @@ def _load_raw(relative_path: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+# 只匹配 {纯字母下划线标识符}，跳过 JSON 示例中含数字/标点的花括号
+_VAR_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
 def load_prompt(relative_path: str, **kwargs: str) -> str:
     """
     加载并返回 prompt 文本。
 
-    Args:
-        relative_path: 相对于 prompts/ 的路径（不含 .md 扩展名）
-                       例如："system/main_agent", "planner/intent_router"
-        **kwargs:      变量键值对，用于替换文本中的 {变量名} 占位符
-
-    Returns:
-        处理后的 prompt 字符串
+    使用正则替换而非 str.format_map()，避免 prompt 文件中
+    JSON 示例的花括号被误当成 Python 格式占位符（Invalid format specifier）。
+    只替换 {纯标识符} 形式的占位符，其余 { } 原样保留。
     """
     raw = _load_raw(relative_path)
     text = _strip_meta_comments(raw)
     if kwargs:
-        # 使用 format_map 支持部分替换（未提供的变量保持原样）
-        text = text.format_map(_SafeDict(kwargs))
+        text = _VAR_RE.sub(lambda m: kwargs.get(m.group(1), m.group(0)), text)
     return text
 
 
@@ -88,6 +87,6 @@ def reload_prompt(relative_path: str, **kwargs: str) -> str:
 
 
 class _SafeDict(dict):
-    """当 key 不存在时，原样保留 {key} 占位符，而不是抛出 KeyError。"""
+    """向后兼容保留，新代码已不再使用 format_map。"""
     def __missing__(self, key: str) -> str:
         return "{" + key + "}"

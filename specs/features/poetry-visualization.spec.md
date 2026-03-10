@@ -2,8 +2,30 @@
 
 **Feature Branch**: `main`  
 **Created**: 2026-03-05  
-**Status**: Draft  
-**Input**: 用户描述: "用户输入中文诗句，系统通过 RAG + GLM LangGraph Agent 管道生成与诗意相符的可视化图像，并通过任务轮询将结果展示给用户；用户可在历史页面查看所有曾提交的任务"
+**Updated**: 2026-03-06  
+**Status**: In Progress（主流程已可用，功能持续迭代中）
+
+---
+
+## 概述
+
+用户与 **LangGraph ReAct Agent** 对话，Agent 自主决策：
+- 问答/赏析 → 调用 `search_poetry` 工具检索知识库并回答
+- 生图需求 → 调用 `visualize_poem` 工具完成 RAG→提示词增强→CogView-4 生图
+- 诗句输入（前端 `detectVisualizeIntent` 自动识别）→ 走独立 Storyboard 分镜流程，多张图逐步推送
+
+> ⚠️ **注意**：主流程（对话 & 分镜）**经过 Backend 代理**，Frontend → Backend → AI Service。
+> Backend 负责 JWT 认证、SSE 代理转发和历史记录持久化。
+> 直连 AI Service 的通道已关闭（符合 constitution §3.1 分层规范）。
+
+---
+
+## ~~旧版说明（已废弃，仅供参考）~~
+
+> ~~"用户输入中文诗句，系统通过 RAG + GLM LangGraph Agent 管道生成与诗意相符的可视化图像，并通过任务轮询将结果展示给用户"~~
+>
+> 此描述对应旧的"提交任务 → 轮询 → 回调"架构，**当前已被 SSE 直连架构取代**。
+> 旧路径（`/api/v1/poetry/generate` + 轮询 + callback）仍保留在 Backend，供脚本测试使用，但不再是主 UX。
 
 ---
 
@@ -28,161 +50,155 @@
 
 ---
 
-### 用户故事 2 - 提交诗词生成任务 (优先级: P1) ⭐ 核心
+### 用户故事 2 — 诗词问答对话 [P1] ✅ 已实现
 
-已登录用户在工作台输入诗句，点击生成，系统异步触发 RAG 管道，并立即返回任务 ID。
+用户输入问题（如"李白最著名的几首诗"），ReAct Agent 检索知识库后流式输出回答。
 
-**为什么是 P1**: 这是系统的核心价值主张。
-**独立测试方式**: Mock AI 服务（返回 202），能提交诗句并拿到 taskId，数据库中出现 PENDING 记录。
+**独立测试方式**: `curl -N -X POST http://localhost:8080/api/v1/poetry/chat -H "Authorization: Bearer <token>" -d '{"message":"静夜思写了什么","session_id":""}'`，能收到 SSE token 事件流。
 **验收场景**:
-1. **Given** 已登录用户输入 1-500 字符的诗句，**When** 调用 `POST /api/v1/poetry/generate`，**Then** 返回 HTTP 200 + `{ taskId: "uuid" }` 且数据库写入 PENDING 记录
-2. **Given** 提交空诗句（poemText 为空或仅空白），**When** 提交，**Then** 返回 HTTP 400 + 错误信息
-3. **Given** 提交超过 500 字符的诗句，**When** 提交，**Then** 返回 HTTP 400
-4. **Given** 未携带 Bearer Token，**When** 提交，**Then** 返回 HTTP 401
+1. **Given** 用户输入问答类文本，**When** 前端 `detectVisualizeIntent` 返回 false，**Then** 走 `/api/v1/poetry/chat`（经 Backend 代理）SSE 路径
+2. **Given** Agent 需要查诗，**When** 推理，**Then** 自动调用 `search_poetry` 工具，前端收到 `tool` / `tool_end` / `rag_result` 事件
+3. **Given** Agent 输出 token，**When** 流式推送，**Then** 前端逐字渲染回复文字
+4. **Given** 多轮对话，**When** 使用同一 `session_id`，**Then** Agent 记忆上下文（MemorySaver）
 
 ---
 
-### 用户故事 3 - 任务状态轮询与结果展示 (优先级: P1) ⭐ 核心
+### 用户故事 3 — 诗句分镜多图生成 [P1] ✅ 已实现 ⭐ 核心
 
-用户提交任务后，前端每 2 秒轮询任务状态，直到 COMPLETED 或 FAILED，随后展示图像或错误。
+用户输入诗句，前端自动识别并触发分镜流程：RAG 检索 → GLM 规划 → CogView-4 逐张生图推送。
 
-**为什么是 P1**: 没有结果展示，整个生成链路无意义。
-**独立测试方式**: 手动将数据库某条任务改为 COMPLETED 并填入 resultImageUrl，轮询接口取到并前端渲染成功。
+**独立测试方式**: `curl -N -X POST http://localhost:8080/api/v1/poetry/storyboard -H "Authorization: Bearer <token>" -d '{"sourceText":"大漠孤烟直，长河落日圆"}'` 能收到 plan + shot_done 事件。
 **验收场景**:
-1. **Given** 有效 taskId，**When** 调用 `GET /api/v1/poetry/task/{taskId}`，**Then** 返回包含 `taskId / originalPoem / retrievedText / enhancedPrompt / resultImageUrl / taskStatus / errorMessage` 的对象
-2. **Given** taskStatus=COMPLETED，**When** 前端收到响应，**Then** 停止轮询并渲染 `resultImageUrl` 图像
-3. **Given** taskStatus=FAILED，**When** 前端收到响应，**Then** 停止轮询并展示 `errorMessage`
-4. **Given** 不存在的 taskId，**When** 查询，**Then** 返回 HTTP 404
-5. **Given** 任务处于 PENDING/PROCESSING，**When** 前端轮询，**Then** 继续每 2s 重复请求
+1. **Given** 用户输入≥10字中文诗句且无问句词，**When** `detectVisualizeIntent` 返回 true，**Then** 前端调用 `/api/v1/poetry/storyboard`（经 Backend 代理）
+2. **Given** RAG 检索完成，**When** 推送 `progress` 事件，**Then** 前端显示检索到的诗词标题
+3. **Given** GLM 规划完成，**When** 推送 `plan` 事件，**Then** 前端显示分镜标题/作者/朝代/总张数
+4. **Given** 每张图生成完成，**When** 推送 `shot_done` 事件，**Then** 前端分镜网格逐格显示图片
+5. **Given** 图生成中，**When** 尚未收到 `shot_done`，**Then** 前端显示骨架占位格
+6. **Given** 全部完成，**When** 收到 `done` 事件，**Then** 前端状态文字更新为"全部完成"
 
 ---
 
-### 用户故事 4 - AI 回调处理 (优先级: P1)
+### 用户故事 4 — 用户注册与登录 [P1] ✅ 已实现
 
-AI 微服务处理完成后，主动 POST 回调 Backend，Backend 更新任务状态和结果字段。
-
-**为什么是 P1**: 没有回调，任务永远停留在 PROCESSING。
-**独立测试方式**: 用 curl 直接调用 `POST /api/v1/poetry/callback`，验证数据库字段更新。
 **验收场景**:
-1. **Given** 正确的 `X-Callback-Token` + status=1 + imageUrl，**When** 调用回调接口，**Then** 数据库 taskStatus=COMPLETED、resultImageUrl 被写入
-2. **Given** 正确 token + status=2 + errorMessage，**When** 调用回调接口，**Then** 数据库 taskStatus=FAILED、errorMessage 被写入
-3. **Given** `X-Callback-Token` 不匹配，**When** 调用回调接口，**Then** 返回 HTTP 401，数据库不变
+1. **Given** 合法 username + password，**When** `POST /api/v1/auth/register`，**Then** 返回 HTTP 200 + `token` + `user`
+2. **Given** 正确凭据，**When** `POST /api/v1/auth/login`，**Then** 返回 JWT token
+3. **Given** 错误密码，**When** 登录，**Then** 返回 HTTP 401
+4. **Given** 未携带 token，**When** 访问受保护 Backend 接口，**Then** 返回 HTTP 401
 
 ---
 
-### 用户故事 5 - GLM 思考流 SSE (优先级: P2)
+### 用户故事 5 — 历史任务记录浏览 [P2] ✅ 已实现
 
-生成过程中，前端通过 SSE 实时展示 GLM Agent 的思考过程文字流。
-
-**为什么是 P2**: 增强用户体验，核心链路不依赖此功能。
-**独立测试方式**: 使用 `curl -N {sse_url}` 能持续收到 `data:` 事件直到 `[DONE]`。
 **验收场景**:
-1. **Given** 有效 taskId 且任务处于 PROCESSING，**When** 连接 SSE 端点，**Then** 收到 `Content-Type: text/event-stream`，持续推送 `data: {"text":"..."}\n\n`
-2. **Given** AI 完成，**When** SSE 流结束，**Then** 推送 `data: [DONE]\n\n` 并关闭连接
-3. **Given** 前端连接超过 120s，**When** 超时，**Then** 前端断开并展示超时提示
+1. **Given** 用户有历史任务，**When** 进入历史页面，**Then** 按倒序展示任务卡片
+2. **Given** 无历史任务，**When** 进入历史页面，**Then** 显示空状态 + 新建引导
+3. **Given** 未登录，**When** 访问历史页面，**Then** 重定向到 `/login`
 
 ---
 
-### 用户故事 6 - 历史任务记录浏览 (优先级: P2)
+### 用户故事 6 — 对话建议词（Suggestions）[P2] ✅ 已实现
 
-已登录用户在历史页面查看自己提交过的所有任务，含图像缩略图、状态和提交时间。
+Agent 回复末尾推送 `💡` 建议块，前端解析为快捷按钮。
 
-**为什么是 P2**: 便于查看过往成果，但不影响核心生成链路。
-**独立测试方式**: 数据库中写入 3 条与当前用户关联的记录（不同状态），历史页面正确渲染列表。
 **验收场景**:
-1. **Given** 当前用户有 N 条历史任务，**When** 进入历史页面，**Then** 按创建时间倒序展示卡片（含缩略图/状态/时间）
-2. **Given** 用户无历史任务，**When** 进入历史页面，**Then** 显示"暂无生成记录"和"新建生成"引导按钮
-3. **Given** 点击历史卡片，**When** 跳转，**Then** 进入该任务的详情/结果页
-4. **Given** 未登录，**When** 访问历史页面，**Then** 被重定向到 `/login`
+1. **Given** Agent 回复含 `💡` 块，**When** 前端解析，**Then** 渲染建议按钮
+2. **Given** 点击建议按钮，**When** 触发，**Then** 直接发送该文本
+
+---
 
 ### 边界与异常场景
 
-- 并发提交同一账号多个任务：每个任务独立 UUID，互不影响
-- AI 服务不可达：任务写入 PENDING，当前版本不自动重试（见开放问题）
-- token 过期：前端清除 localStorage 并重定向到 `/login`
-- 诗句包含特殊字符/emoji：系统应正常处理，不抛出 500
+- 诗句含特殊字符/emoji：系统正常处理，不抛出 500
+- GLM 不可达：前端收到 `error` 事件，显示错误提示
+- session_id 留空：AI Service 自动生成新会话 UUID
+- 分镜单张生成失败：推送 `shot_error` 事件，前端显示该格错误，其余格继续渲染
 
 ---
 
-## 功能性要求 *(必填)*
+## 功能性要求
 
-### 功能性需求
-- **FR-001**: 系统 MUST 在收到提交请求后 300ms 内返回 taskId（不含 AI 处理时间）
-- **FR-002**: 系统 MUST 通过 JWT Bearer Token 保护所有 `/api/v1/poetry/*` 接口
-- **FR-003**: 系统 MUST 用 `X-Callback-Token` 鉴权所有回调请求，Token 不匹配时返回 401
-- **FR-004**: 系统 MUST 仅使用 `PENDING / PROCESSING / COMPLETED / FAILED` 四种任务状态
-- **FR-005**: 用户 MUST 能通过 SSE 实时接收 GLM 思考过程推流
-- **FR-006**: 系统 MUST 保证历史记录只返回当前登录用户的任务（不泄露他人数据）
-- **FR-007**: Backend 错误响应 MUST 使用统一 `ErrorResponse` schema（见 backend.yaml）
-- **FR-008**: poemText 长度 MUST 在 1-500 字符之间，否则返回 HTTP 400
+- **FR-001**: 前端 MUST 通过 `detectVisualizeIntent()` 自动路由，**不得有手动切换按钮**
+- **FR-002**: 分镜生成 MUST 走 `/ai/api/v1/generate/storyboard` 独立 SSE 端点
+- **FR-003**: 对话 MUST 走 `/ai/api/v1/chat` SSE 端点，由 LangGraph ReAct Agent 处理
+- **FR-004**: Agent 工具调用 MUST 以 SSE 事件推送给前端（`tool` / `tool_end` / `rag_result`）
+- **FR-005**: Backend JWT MUST 保护所有 `/api/v1/poetry/*` 及用户数据接口
+- **FR-006**: Backend 错误响应 MUST 使用统一 `ErrorResponse` schema（见 backend.yaml）
+- **FR-007**: poemText 长度 MUST 在 1-500 字符之间
+- **FR-008**: 历史记录 MUST 只返回当前登录用户数据，不泄露他人
+
+### 意图路由规则（前端 `detectVisualizeIntent`）
+
+| 条件 | 路由到 |
+|------|--------|
+| 含关键词：生成图/画出/可视化/意境图/插画/分镜/生图/画一幅/画成 | `/generate/storyboard` |
+| ≥10字中文，无问句词（什么/为什么/如何/怎么/谁/哪/是不是/吗/呢），不以？结尾 | `/generate/storyboard` |
+| 其余 | `/chat` |
 
 ### 关键实体
-- **GenerationTask**: taskId(UUID) / userId / originalPoem / retrievedText / enhancedPrompt / resultImageUrl / taskStatus / errorMessage / createdAt / updatedAt
-- **User**: id / username / passwordHash / nickname / createdAt
+- **ChatMessage**（前端）: id / role / userText / replyText / tools / ragResults / storyboardShots / storyboardPlan / isStreaming
+- **StoryboardShot**: shot_id / shot_name / shot_type / poem_lines / camera_angle / emotion / positive_prompt / image_url
+- **GenerationTask**（Backend MySQL）: taskId / userId / originalPoem / taskStatus / resultImageUrl / createdAt
 
 ---
 
-## 成功指标 *(必填)*
+## 成功指标
 
-### 可量化成果
-
-- **SC-001**: 提交接口 p99 延迟 < 300ms（不含 AI 处理）
-- **SC-002**: 支持 10 路并发任务无状态错乱
-- **SC-003**: 回调 token 校验失败率 0%（不可绕过）
-- **SC-004**: 前端轮询误差在 2s ± 200ms 内
-- **SC-005**: 历史页面加载（首屏）< 1s（不含图片加载）
+- **SC-001**: 对话首 token 到达延迟 < 3s
+- **SC-002**: 分镜第一张图到达延迟 < 30s
+- **SC-003**: 历史页面首屏加载 < 1s（不含图片）
+- **SC-004**: `detectVisualizeIntent` 误判率 < 5%（典型诗句 & 问答各 20 条测试）
 
 ---
 
 ## 附录 A：非目标（本期不做）
-- 图像存储至 OSS（当前返回 mock URL）
-- 任务失败后自动重试
-- 多语言支持（中文界面固定）
+- 图像存储至 OSS
+- 任务失败自动重试
 - 管理员后台
 - 账号注销 / 修改密码
+- 会话历史持久化到数据库（当前 MemorySaver 重启后丢失）
 
 ---
 
 ## 附录 B：环境变量规范
 
-| 变量名 | 必填 | 示例值 | 说明 |
-|--------|------|--------|------|
-| `DB_URL` | ✅ | `jdbc:mysql://localhost:3306/poetry_rag` | MySQL 连接串 |
-| `DB_USERNAME` | ✅ | `root` | 数据库用户名 |
-| `DB_PASSWORD` | ✅ | `secret` | 数据库密码 |
-| `AI_SERVICE_URL` | ✅ | `http://127.0.0.1:8000/ai/api/v1/generate/async` | AI Service 异步触发地址 |
-| `AI_CALLBACK_URL` | ✅ | `http://127.0.0.1:8080/api/v1/poetry/callback` | Backend 回调地址（AI Service 使用）|
-| `AI_CALLBACK_TOKEN` | ✅ | `poetry-callback-token-change-me` | 回调鉴权 token |
-| `GLM_API_KEY` | ✅ | `xxx.yyy` | 智谱 AI API Key |
-| `GLM_BASE_URL` | ✅ | `https://open.bigmodel.cn/api/paas/v4` | GLM API Base URL |
-| `GLM_MODEL` | ❌ | `glm-4-flash` | 使用的模型（glm-4-flash / glm-5）|
-| `GLM_TIMEOUT` | ❌ | `90` | GLM 请求超时秒数，默认 60 |
-| `CHROMA_PATH` | ❌ | `data/chromadb` | ChromaDB 本地路径 |
-| `TOP_K` | ❌ | `5` | RAG 检索条数，默认 5 |
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `GLM_API_KEY` | ✅ | 智谱 AI API Key |
+| `GLM_BASE_URL` | ✅ | GLM API Base URL |
+| `GLM_MODEL` | ❌ | 模型名，默认 glm-4-flash |
+| `GLM_TIMEOUT` | ❌ | 超时秒数，默认 60 |
+| `CHROMA_PATH` | ❌ | ChromaDB 路径，默认 data/chromadb |
+| `TOP_K` | ❌ | RAG 检索条数，默认 5 |
+| `COGVIEW_MODEL` | ❌ | 生图模型，默认 cogview-4 |
+| `DB_URL` | ✅ | (Backend) MySQL 连接串 |
+| `DB_USERNAME` / `DB_PASSWORD` | ✅ | (Backend) 数据库凭据 |
 
 ---
 
 ## 附录 C：接口引用
 
-- Backend REST API: [specs/openapi/backend.yaml](../openapi/backend.yaml)
-  - `POST /api/v1/auth/register`  注册
-  - `POST /api/v1/auth/login`  登录（返回 JWT）
-  - `POST /api/v1/poetry/generate`  提交任务
-  - `GET  /api/v1/poetry/task/{taskId}`  查询状态
-  - `POST /api/v1/poetry/callback`  AI 回调（X-Callback-Token 鉴权）
-  - `GET  /api/v1/poetry/task/{taskId}/stream`  SSE 思考流
-- AI Service API: [specs/openapi/ai-service.yaml](../openapi/ai-service.yaml)
-  - `POST /ai/api/v1/generate/async`  异步触发管道
+- AI Service: [specs/openapi/ai-service.yaml](../openapi/ai-service.yaml)
+  - `POST /ai/api/v1/chat` — ⭐ 主对话 SSE
+  - `POST /ai/api/v1/generate/storyboard` — ⭐ 分镜生成 SSE
+  - `POST /ai/api/v1/chat/session` — 创建会话
+  - `GET /ai/api/v1/chat/session/{id}/history` — 历史消息
+- Backend: [specs/openapi/backend.yaml](../openapi/backend.yaml)
+  - `POST /api/v1/auth/register` / `POST /api/v1/auth/login`
+  - `POST /api/v1/poetry/chat` — ⭐ 主对话 SSE 代理（JWT）
+  - `POST /api/v1/poetry/storyboard` — ⭐ 分镜生成 SSE 代理（JWT）
+  - `POST /api/v1/poetry/chat/session` — 创建会话（JWT）
+  - `GET  /api/v1/poetry/history` — 历史记录（JWT）
 - 数据模型: [specs/architecture/data-model.md](../architecture/data-model.md)
 - 系统架构: [specs/architecture/system-overview.md](../architecture/system-overview.md)
-- RAG 管道详情: [specs/features/rag-pipeline.spec.md](rag-pipeline.spec.md)
+- RAG 管道: [specs/features/rag-pipeline.spec.md](rag-pipeline.spec.md)
 
 ---
 
 ## 附录 D：开放问题
 
-- [ ] 图像存储方案最终选型：本地文件系统 / 对象存储 / Base64 内嵌？
-- [ ] AI 服务不可达时是否需要队列重试机制（当前版本不做）？
-- [ ] 任务历史数据保留策略：永久保留 / 定期清理？
-- [ ] `enhancedPrompt` 是否需要翻译为标准 Stable Diffusion 标签格式？
-- [ ] 图像生成当前是否已集成（还是仍返回 mock URL）？需明确里程碑
+- [ ] `detectVisualizeIntent` 短诗句（<10字）目前走对话，是否需要更细粒度规则？
+- [ ] `visualize_poem` 工具（单图）与 Storyboard 流程（多图）是两套生图逻辑，是否统一？
+- [x] SSE 主流程生成的图像未写入 MySQL 历史，需补全写入逻辑（已完成：AiProxyController.storyboard() + saveStoryboardHistory()）
+- [ ] MemorySaver 会话记忆重启后丢失，是否需要 Redis 持久化？
+- [ ] 分镜 CogView-4 当前串行生图，是否改为并行提速？

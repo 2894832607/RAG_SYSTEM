@@ -8,6 +8,9 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 public class AiServiceProperties {
   @NotBlank
+  private String baseUrl;
+
+  @NotBlank
   private String url;
 
   @NotBlank
@@ -15,6 +18,14 @@ public class AiServiceProperties {
 
   @NotBlank
   private String callbackToken;
+
+  public String getBaseUrl() {
+    return baseUrl;
+  }
+
+  public void setBaseUrl(String baseUrl) {
+    this.baseUrl = baseUrl;
+  }
 
   public String getUrl() {
     return url;

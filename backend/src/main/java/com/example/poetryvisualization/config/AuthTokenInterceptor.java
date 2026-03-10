@@ -3,6 +3,7 @@ package com.example.poetryvisualization.config;
 import com.example.poetryvisualization.service.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -16,7 +17,7 @@ public class AuthTokenInterceptor implements HandlerInterceptor {
     }
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(@NonNull HttpServletRequest request, @NonNull HttpServletResponse response, @NonNull Object handler) throws Exception {
         String path = request.getRequestURI();
 
         if (path.startsWith("/api/v1/auth") || path.equals("/api/v1/poetry/callback") || path.startsWith("/actuator")) {

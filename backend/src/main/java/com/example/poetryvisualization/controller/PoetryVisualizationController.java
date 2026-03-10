@@ -5,12 +5,15 @@ import com.example.poetryvisualization.dto.PoetryCallbackRequest;
 import com.example.poetryvisualization.entity.GenerationTask;
 import com.example.poetryvisualization.config.AiServiceProperties;
 import com.example.poetryvisualization.service.TaskDispatchService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.poetryvisualization.mapper.GenerationTaskMapper;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -22,7 +25,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/poetry")
@@ -31,10 +37,14 @@ public class PoetryVisualizationController {
 
   private final TaskDispatchService dispatchService;
   private final AiServiceProperties aiServiceProperties;
+  private final GenerationTaskMapper taskMapper;
 
-  public PoetryVisualizationController(TaskDispatchService dispatchService, AiServiceProperties aiServiceProperties) {
+  public PoetryVisualizationController(TaskDispatchService dispatchService,
+                                        AiServiceProperties aiServiceProperties,
+                                        GenerationTaskMapper taskMapper) {
     this.dispatchService = dispatchService;
     this.aiServiceProperties = aiServiceProperties;
+    this.taskMapper = taskMapper;
   }
 
   /** 提交诗句 → 创建可视化任务 */
@@ -80,6 +90,7 @@ public class PoetryVisualizationController {
    * 前端通过 fetch() 连接此端点（支持自定义 Authorization 头）。
    */
   @PostMapping(value = "/think-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  @SuppressWarnings("null")
   public SseEmitter thinkStream(@RequestBody PoemTaskRequest request) {
     SseEmitter emitter = new SseEmitter(120_000L);
 
@@ -114,7 +125,7 @@ public class PoetryVisualizationController {
             if (trimmed.isEmpty()) continue;
             if (trimmed.startsWith("data:")) {
               String data = trimmed.substring(5).trim();
-              emitter.send(SseEmitter.event().data(data, MediaType.TEXT_PLAIN));
+              emitter.send(SseEmitter.event().data((Object) Objects.requireNonNullElse(data, ""), MediaType.TEXT_PLAIN));
               if ("[DONE]".equals(data)) break;
             }
           }
@@ -132,5 +143,60 @@ public class PoetryVisualizationController {
     if (value == null) return "";
     return value.replace("\\", "\\\\").replace("\"", "\\\"")
                 .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+  }
+
+  /**
+   * 查询当前用户的历史生成任务列表（倒序，仅返回当前用户数据）。
+   * <p>
+   * Spec: specs/openapi/backend.yaml §/api/v1/poetry/history
+   * Spec: specs/features/poetry-visualization.spec.md §用户故事 5
+   */
+  @GetMapping("/history")
+  public ResponseEntity<Map<String, Object>> listHistory(
+      HttpServletRequest httpRequest,
+      @RequestParam(defaultValue = "1") int page,
+      @RequestParam(defaultValue = "20") int pageSize) {
+    Long userId = (Long) httpRequest.getAttribute("authenticatedUserId");
+
+    LambdaQueryWrapper<GenerationTask> wrapper = new LambdaQueryWrapper<>();
+    wrapper.eq(GenerationTask::getUserId, userId)
+           .orderByDesc(GenerationTask::getGmtCreate);
+
+    List<GenerationTask> rawList = taskMapper.selectList(wrapper);
+
+    // 简单内存分页
+    int total = rawList.size();
+    int fromIdx = Math.min((page - 1) * pageSize, total);
+    int toIdx   = Math.min(fromIdx + pageSize, total);
+    List<Map<String, Object>> items = rawList.subList(fromIdx, toIdx).stream()
+        .map(t -> {
+          Map<String, Object> item = new HashMap<>();
+          item.put("taskId",         t.getTaskId());
+          item.put("originalPoem",   t.getOriginalPoem() != null   ? t.getOriginalPoem()   : "");
+          item.put("resultImageUrl", t.getResultImageUrl() != null  ? t.getResultImageUrl() : "");
+          item.put("taskStatus",     resolveStatusLabel(t.getTaskStatus()));
+          item.put("createdAt",      t.getGmtCreate() != null       ? t.getGmtCreate().toString() : "");
+          return item;
+        })
+        .collect(Collectors.toList());
+
+    return ResponseEntity.ok(Map.of(
+        "code", 200,
+        "data", Map.of(
+            "total", total,
+            "page", page,
+            "pageSize", pageSize,
+            "items", items
+        )
+    ));
+  }
+
+  private static String resolveStatusLabel(Integer status) {
+    if (status == null) return "PENDING";
+    return switch (status) {
+      case 1 -> "COMPLETED";
+      case 2 -> "FAILED";
+      default -> "PENDING";
+    };
   }
 }

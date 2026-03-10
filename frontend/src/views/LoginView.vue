@@ -78,10 +78,11 @@ const getErrorMessage = (error: unknown): string => {
   if (axiosError.code === 'ERR_NETWORK') {
     return '网络请求失败，请确认后端服务 http://127.0.0.1:8080 已启动'
   }
-  return '请求失败，请稍后重试'
+  return `请求失败 (${status ?? '无响应'})，请稍后重试`
 }
 
 const handleSubmit = async () => {
+  if (loading.value) return // 防止 Enter 键多次触发并发请求
   const trimmedUsername = username.value.trim()
   const trimmedNickname = nickname.value.trim()
 

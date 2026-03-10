@@ -5,6 +5,7 @@ import com.example.poetryvisualization.config.AiServiceProperties;
 import com.example.poetryvisualization.dto.PoetryCallbackRequest;
 import com.example.poetryvisualization.entity.GenerationTask;
 import com.example.poetryvisualization.mapper.GenerationTaskMapper;
+import com.example.poetryvisualization.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,8 +83,8 @@ public class TaskDispatchService {
     wrapper.eq(GenerationTask::getTaskId, taskId);
     GenerationTask task = taskMapper.selectOne(wrapper);
     if (task == null) {
-      throw new IllegalArgumentException("Task not found: " + taskId);
-    }
+            throw new ResourceNotFoundException("Task not found: " + taskId);
+        }
     return task;
   }
 

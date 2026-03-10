@@ -4,20 +4,32 @@ from typing import AsyncGenerator
 
 import httpx
 
+from app.config.model_config import get_llm_config
+
 
 class GlmClient:
+    """
+    文本 LLM 客户端（raw httpx，OpenAI Chat Completions 兼容）。
+
+    提供商、端点、模型名、API Key 均从 model_config 读取，
+    支持 GLM / 豆包 / Ollama 等任意 OpenAI 兼容服务。
+
+    Spec: specs/001-model-api-config/spec.md §3.3
+    """
+
     def __init__(self) -> None:
-        self.api_key = os.getenv("GLM_API_KEY", "").strip()
-        self.base_url = os.getenv("GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4").rstrip("/")
-        self.model = os.getenv("GLM_MODEL", "glm-5")
-        self.timeout = float(os.getenv("GLM_TIMEOUT", "30"))
+        cfg = get_llm_config()
+        self.api_key  = cfg.api_key
+        self.base_url = cfg.base_url
+        self.model    = cfg.model
+        self.timeout  = cfg.timeout
 
     def is_enabled(self) -> bool:
         return bool(self.api_key)
 
     def complete(self, user_prompt: str, system_prompt: str = "你是一个擅长中文诗意场景描述的提示词助手。") -> str:
         if not self.is_enabled():
-            raise RuntimeError("GLM_API_KEY 未配置")
+            raise RuntimeError("模型 API Key 未配置，请设置 LLM_API_KEY 环境变量")
 
         url = f"{self.base_url}/chat/completions"
         payload = {
@@ -42,12 +54,12 @@ class GlmClient:
 
         choices = data.get("choices") or []
         if not choices:
-            raise RuntimeError("GLM 返回为空")
+            raise RuntimeError("模型返回为空")
         message = choices[0].get("message") or {}
-        # GLM-5 等推理模型正文在 reasoning_content，普通模型在 content
+        # 部分推理模型正文在 reasoning_content，普通模型在 content
         content = message.get("content") or message.get("reasoning_content") or ""
         if not content:
-            raise RuntimeError("GLM 返回内容为空（content 和 reasoning_content 均为空）")
+            raise RuntimeError("模型返回内容为空（content 和 reasoning_content 均为空）")
         return content.strip()
 
     async def stream_thinking(
@@ -55,12 +67,12 @@ class GlmClient:
         user_prompt: str,
         system_prompt: str = "你是一个擅长中文诗意场景描述的提示词助手。",
     ) -> AsyncGenerator[str, None]:
-        """异步流式生成 GLM 思考过程，每次 yield 一个文本片段。
-        对于 GLM-5 推理模型，优先 yield reasoning_content delta；
+        """异步流式生成，每次 yield 一个文本片段。
+        对于推理模型，优先 yield reasoning_content delta；
         普通模型 yield content delta。
         """
         if not self.is_enabled():
-            raise RuntimeError("GLM_API_KEY 未配置")
+            raise RuntimeError("模型 API Key 未配置，请设置 LLM_API_KEY 环境变量")
 
         url = f"{self.base_url}/chat/completions"
         payload = {

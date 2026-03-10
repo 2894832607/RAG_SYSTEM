@@ -1,5 +1,35 @@
 # Copy this file to local-env.ps1 and fill your own values.
-$env:GLM_API_KEY = 'your_glm_api_key_here'
-$env:GLM_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
-$env:GLM_MODEL = 'glm-5'
-$env:GLM_TIMEOUT = '90'
+# See specs/001-model-api-config/quickstart.md for full switching guide.
+
+# ── 文本 LLM 配置（新变量，推荐使用）─────────────────────────────────────
+# LLM_PROVIDER: glm | doubao | openai | qwen | ollama | custom
+# 设定后 LLM_BASE_URL 会自动使用对应预设端点，无需手动填写。
+$env:LLM_PROVIDER = 'glm'
+$env:LLM_API_KEY  = 'your_api_key_here'
+$env:LLM_MODEL    = 'glm-4-flash'
+# $env:LLM_BASE_URL    = ''        # 仅 custom 或覆盖预设时需要填写
+# $env:LLM_TEMPERATURE = '0.7'
+# $env:LLM_TIMEOUT     = '90'
+
+# ── 图像生成配置（可选，默认继承 LLM 配置）───────────────────────────────
+# IMAGE_PROVIDER: cogview（默认）| disabled（禁用图像生成，本地开发用）
+# $env:IMAGE_PROVIDER = 'cogview'
+# $env:IMAGE_API_KEY  = ''         # 留空时使用 LLM_API_KEY
+# $env:IMAGE_BASE_URL = ''         # 留空时使用 LLM_BASE_URL
+# $env:IMAGE_MODEL    = 'cogview-4-250304'
+
+# ── 切换示例：豆包 ────────────────────────────────────────────────────────
+# $env:LLM_PROVIDER = 'doubao'
+# $env:LLM_API_KEY  = 'your_ark_api_key'
+# $env:LLM_MODEL    = 'ep-xxxxxxxxxxxxxxxxxx'
+
+# ── 切换示例：本地 Ollama ─────────────────────────────────────────────────
+# $env:LLM_PROVIDER = 'ollama'
+# $env:LLM_MODEL    = 'llama3'
+# (LLM_API_KEY 留空即可)
+
+# ── [DEPRECATED] 旧版 GLM 变量（向后兼容，仍有效，推荐迁移到新变量）──────
+# $env:GLM_API_KEY  = 'your_glm_api_key_here'
+# $env:GLM_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
+# $env:GLM_MODEL    = 'glm-4-flash'
+# $env:GLM_TIMEOUT  = '90'

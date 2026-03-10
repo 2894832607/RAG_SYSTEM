@@ -14,9 +14,17 @@ A modular implementation scaffold for the research project described in the desi
 
 ## Getting started
 1. Create per-module `.env` files (see each module README) to map URLs, DB credentials, and GPU model weights.
+   - **Important**: Ensure `CALLBACK_TOKEN` is consistent across **Backend** and **AI Service**.
 2. Start the backend to expose `/api/v1/poetry/visualize` and `/api/v1/poetry/callback` endpoints.
 3. Run the AI microservice (preferably under `uvicorn --reload`) and ensure it can reach ChromaDB/embedding storage.
 4. Bootstrap the frontend via `npm install`/`npm run dev` while pointing to the backend gateway.
+
+## Environment Variables
+| Variable | Required | Description |
+|---|---|---|
+| `CALLBACK_TOKEN` | Yes | Shared secret for AI Service -> Backend callback authentication. |
+| `AI_SERVICE_URL` | Yes | (Backend) Endpoint for the AI Microservice. |
+| `CALLBACK_URL` | Yes | (AI Service) Webhook URL for posting generation results. |
 
 ## Next steps
 - Populate the frontend with actual task polling (long-poll vs. websocket) and gallery persistence.

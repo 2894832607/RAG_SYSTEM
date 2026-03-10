@@ -49,3 +49,13 @@ export function submitPoemTask(poemText: string) {
 export function fetchTaskStatus(taskId: string) {
   return gateway.get(`/poetry/task/${taskId}`);
 }
+
+/** 查询当前用户历史生成任务（走 Backend JWT 认证） */
+export function fetchHistory(page = 1, pageSize = 20) {
+  return gateway.get('/poetry/history', { params: { page, pageSize } });
+}
+
+/** 创建对话会话（经由 Backend 代理到 AI Service） */
+export function createChatSession() {
+  return gateway.post('/poetry/chat/session');
+}

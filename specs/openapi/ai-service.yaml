@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: Poetry RAG — AI Service API
-  version: "0.2.0"
+  version: "0.4.0"
   description: |
     FastAPI AI 微服务对外暴露的接口。
-    内部集成 LangGraph Agent、GLM-4/5、ChromaDB 向量检索。
-    对外提供异步生成、同步冒烟测试、GLM 思考流 SSE 三类接口。
+    内部集成 LangGraph ReAct Agent、可配置 LLM（GLM / 豆包 / OpenAI / Ollama 等）、ChromaDB 向量检索、图像生成（CogView-4 等）。
+    提供健康检查、异步生成、同步冒烟测试、思考流 SSE、LangGraph 对话 SSE、分镜多图 SSE 六类接口。
+    LLM 和图像模型通过环境变量 `LLM_PROVIDER` / `IMAGE_PROVIDER` 自由配置，无需修改代码。
 
 servers:
   - url: http://localhost:8000
@@ -14,10 +15,46 @@ servers:
 tags:
   - name: generate
     description: 诗词图像生成（核心流水线）
+  - name: chat
+    description: LangGraph ReAct Agent 对话（SSE）
+  - name: storyboard
+    description: 诗词分镜多图生成（SSE）
   - name: mock
     description: 本地调试 mock 接口
 
 paths:
+  # ── 健康检查 ─────────────────────────────────────────────────────────────
+  /ai/health:
+    get:
+      summary: 服务健康检查
+      operationId: healthCheck
+      tags: []
+      description: |
+        返回服务运行状态及当前配置的模型信息（不含密钥）。
+        `models.llm.enabled` 和 `models.image.enabled`
+        反映配置是否完整（API Key 存在 / provider 为 ollama），
+        不代表远端服务实时可达。
+      responses:
+        "200":
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                service: "poetry rag ai"
+                models:
+                  llm:
+                    provider: doubao
+                    model: "ep-xxxxxxxxxx"
+                    base_url: "https://ark.cn-beijing.volces.com/api/v3"
+                    enabled: true
+                  image:
+                    provider: cogview
+                    model: "cogview-4-250304"
+                    enabled: true
+
   # ── 异步生成（主流程）──────────────────────────────────────────────────────
   /ai/api/v1/generate/async:
     post:
@@ -97,6 +134,170 @@ paths:
             text/event-stream:
               schema:
                 type: string
+
+  # ── 对话 Session 管理 ──────────────────────────────────────────────────────
+  /ai/api/v1/chat/session:
+    post:
+      summary: 创建新对话会话
+      operationId: createChatSession
+      tags: [chat]
+      description: |
+        创建一个新的 LangGraph 对话会话，返回 `session_id`。
+        后续对话请求均需携带此 `session_id` 以维持上下文记忆。
+        `session_id` 留空调用 `/ai/api/v1/chat` 时会自动生成并在 `done` 事件中返回。
+      responses:
+        "200":
+          description: 会话已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+              example:
+                session_id: "550e8400-e29b-41d4-a716-446655440000"
+
+  /ai/api/v1/chat/session/{session_id}/history:
+    get:
+      summary: 获取会话历史消息
+      operationId: getChatHistory
+      tags: [chat]
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 历史消息列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatHistoryItem'
+        "503":
+          description: LLM_API_KEY 未配置（或 LLM_PROVIDER 对应密钥缺失）
+
+  /ai/api/v1/chat/session/{session_id}:
+    delete:
+      summary: 清空会话历史记忆
+      operationId: clearChatSession
+      tags: [chat]
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 会话已清空
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  session_id:
+                    type: string
+
+  # ── LangGraph Agent 对话 SSE ──────────────────────────────────────────────
+  /ai/api/v1/chat:
+    post:
+      summary: LangGraph ReAct Agent 流式对话
+      operationId: chatStream
+      tags: [chat]
+      description: |
+        基于 LangGraph ReAct Agent（可配置 LLM + ChromaDB）的 SSE 流式对话接口。
+
+        Agent 拥有两个工具：
+        - `search_poetry`：在 ChromaDB 向量库中检索古诗词
+        - `visualize_poem`：RAG → Prompt 增强 → 图像生成（取决于 IMAGE_PROVIDER 配置）
+
+        **SSE 事件格式**（每行 `data: {JSON}`）：
+        | type | 触发时机 | 关键字段 |
+        |------|---------|----------|
+        | `token` | LLM 逐 token 输出 | `content` |
+        | `tool` | 工具调用开始 | `name`, `display`, `input` |
+        | `tool_end` | 工具调用返回 | `name`, `output` |
+        | `node_progress` | Agent/Tools 节点切换 | `node`, `iteration`, `label` |
+        | `rag_result` | search_poetry 工具完成时额外推送 | `mode`, `poems` |
+        | `done` | 流结束 | `session_id` |
+        | `error` | 发生错误 | `content` |
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            example:
+              message: "李白最著名的诗是哪首？"
+              session_id: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: Server-Sent Events 流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE 事件流，可能的事件示例：
+                  data: {"type": "token", "content": "李"}
+                  data: {"type": "tool", "name": "search_poetry", "display": "正在检索古诗词库……", "input": "{\"keyword\": \"李白\"}"}
+                  data: {"type": "tool_end", "name": "search_poetry", "output": "**《静夜思》…"}
+                  data: {"type": "rag_result", "mode": "exact", "poems": [{"title": "静夜思", ...}]}
+                  data: {"type": "done", "session_id": "550e8400..."}
+        "503":
+          description: LLM_API_KEY 未配置（或 LLM_PROVIDER 对应密钥缺失），Agent 不可用
+
+  # ── 分镜多图生成 SSE ──────────────────────────────────────────────────────
+  /ai/api/v1/generate/storyboard:
+    post:
+      summary: 诗词分镜多图生成（SSE）
+      operationId: storyboardStream
+      tags: [storyboard]
+      description: |
+        输入一句诗词，系统自动执行：
+        1. **RAG 检索**：从 ChromaDB 向量库获取完整原诗 + 白话译文
+        2. **LLM 规划**：生成 1 张全景基调图 + 3-5 张叙事分镜方案（取决于 LLM_PROVIDER 配置）
+        3. **图像生成逐张推送**：每完成一张立即推送（图与图之间 4s 限速间隔，取决于 IMAGE_PROVIDER 配置）
+
+        **SSE 事件格式**（每行 `data: {JSON}`）：
+        | type | 触发时机 | 关键字段 |
+        |------|---------|----------|
+        | `progress` | RAG 完成 / 开始规划 / 等待限速 | `stage`, `message`, `current`, `total` |
+        | `plan` | GLM 规划方案生成完毕 | `poem_title`, `global_style`, `total_shots`, `shots` |
+        | `shot_done` | 单张图生成完成 | `shot_id`, `shot_name`, `shot_type`, `poem_lines`, `image_url`, `current`, `total` |
+        | `shot_error` | 单张图生成失败 | `shot_id`, `shot_name`, `message`, `current`, `total` |
+        | `done` | 全部图生成完毕 | `total_shots` |
+
+        `progress.stage` 枚举值：`rag_done` / `planning` / `generating` / `waiting`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleGenerationRequest'
+            example:
+              sourceText: "大漠孤烟直，长河落日圆"
+      responses:
+        "200":
+          description: Server-Sent Events 流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE 事件流示例：
+                  data: {"type": "progress", "stage": "rag_done", "message": "已检索到《使至塞上》…", "current": 0, "total": 0}
+                  data: {"type": "plan", "poem_title": "使至塞上", "global_style": "大漠苍凉…", "total_shots": 4, "shots": [...]}
+                  data: {"type": "shot_done", "shot_id": 1, "shot_name": "全景", "image_url": "http://…", "current": 1, "total": 4}
+                  data: {"type": "done", "total_shots": 4}
+        "503":
+          description: LLM_API_KEY 未配置（或 LLM_PROVIDER 对应密钥缺失），分镜服务不可用
+        "500":
+          description: RAG 检索失败
 
   # ── Mock 调试接口 ─────────────────────────────────────────────────────────
   /ai/api/v1/mock/callback/{taskId}:
@@ -187,3 +388,141 @@ components:
             imageUrl:
               type: string
               format: uri
+
+    # ── Chat 相关 Schema ───────────────────────────────────────────────────
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: 用户输入的问题或指令
+          example: "李白最著名的诗是哪首？"
+        session_id:
+          type: string
+          description: 会话 ID，留空时自动创建新会话（done 事件中返回实际 session_id）
+          default: ""
+
+    SessionResponse:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          type: string
+          description: 新创建的会话 ID（UUID v4）
+          example: "550e8400-e29b-41d4-a716-446655440000"
+
+    ChatHistoryItem:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+
+    # ── 分镜相关 Schema ───────────────────────────────────────────────────
+    StoryboardShot:
+      type: object
+      description: 单张分镜图的规划信息（plan 事件中的 shots 数组元素）
+      properties:
+        shot_id:
+          type: integer
+        shot_name:
+          type: string
+          example: "全景：大漠孤烟"
+        shot_type:
+          type: string
+          enum: [global, narrative]
+          description: global=全景基调图，narrative=叙事分镜
+        poem_lines:
+          type: array
+          items:
+            type: string
+        translation_excerpt:
+          type: string
+        camera_angle:
+          type: string
+        emotion:
+          type: string
+        positive_prompt:
+          type: string
+          description: CogView-4 正向提示词（英文）
+
+    StoryboardPlan:
+      type: object
+      description: LLM 规划的分镜方案（plan 事件的 data 字段）
+      required: [type, poem_title, total_shots, shots]
+      properties:
+        type:
+          type: string
+          enum: [plan]
+        poem_title:
+          type: string
+        global_style:
+          type: string
+        total_shots:
+          type: integer
+        shots:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoryboardShot'
+
+    # ── 配置与健康检查 Schema ─────────────────────────────────────────────
+    LlmModelInfo:
+      type: object
+      description: 当前配置的文本 LLM 信息
+      required: [provider, model, base_url, enabled]
+      properties:
+        provider:
+          type: string
+          description: "提供商标识：glm / doubao / openai / qwen / ollama / custom"
+          example: doubao
+        model:
+          type: string
+          description: 当前使用的模型名称
+          example: "ep-xxxxxxxxxx"
+        base_url:
+          type: string
+          description: API 基础 URL（不含 /chat/completions）
+          example: "https://ark.cn-beijing.volces.com/api/v3"
+        enabled:
+          type: boolean
+          description: API Key 是否已配置（true=密钥存在或 provider=ollama）
+
+    ImageModelInfo:
+      type: object
+      description: 当前配置的图像生成模型信息
+      required: [provider, model, enabled]
+      properties:
+        provider:
+          type: string
+          description: "提供商标识：cogview / disabled"
+          example: cogview
+        model:
+          type: string
+          example: "cogview-4-250304"
+        enabled:
+          type: boolean
+          description: 图像生成是否启用（provider != disabled 且密钥已配置）
+
+    HealthResponse:
+      type: object
+      required: [status, service, models]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          example: ok
+        service:
+          type: string
+          example: "poetry rag ai"
+        models:
+          type: object
+          required: [llm, image]
+          properties:
+            llm:
+              $ref: '#/components/schemas/LlmModelInfo'
+            image:
+              $ref: '#/components/schemas/ImageModelInfo'

@@ -1,41 +1,42 @@
 """
-GLM LLM 封装（通过 langchain-openai 兼容层接入）
+LLM 封装（通过 langchain-openai 兼容层接入）
 
-智谱 AI 的 GLM 系列完全兼容 OpenAI Chat Completions API，
-因此可以直接用 ChatOpenAI 指定 base_url 来驱动。
+支持任意 OpenAI Chat Completions 兼容的提供商（GLM、豆包、OpenAI、Ollama 等），
+通过 app/config/model_config.py 统一读取环境变量配置，无需修改本文件即可切换模型。
+
+Spec: specs/001-model-api-config/spec.md §3.2
 """
 import os
 from functools import lru_cache
 
 from langchain_openai import ChatOpenAI
 
+from app.config.model_config import get_llm_config
 
-@lru_cache(maxsize=1)
-def get_llm(temperature: float = 0.7) -> ChatOpenAI:
+
+def get_llm(temperature: float | None = None) -> ChatOpenAI:
     """
-    返回全局单例 GLM LLM。
+    返回 LLM 实例（ChatOpenAI 兼容层）。
 
-    环境变量：
-        GLM_API_KEY   - 必须（智谱 AI 开放平台 API Key）
-        GLM_BASE_URL  - 可选，默认 https://open.bigmodel.cn/api/paas/v4
-        GLM_MODEL     - 可选，默认 glm-4-flash
+    提供商、端点、模型名、API Key 均从环境变量读取（见 model_config.py）。
+    temperature 参数若传入则覆盖配置中的默认值。
+
+    返回 None 当 API Key 未配置且非 Ollama 本地模式。
     """
-    api_key = os.getenv("GLM_API_KEY", "").strip()
-    base_url = os.getenv("GLM_BASE_URL", "https://open.bigmodel.cn/api/paas/v4").rstrip("/")
-    model = os.getenv("GLM_MODEL", "glm-4-flash")
+    cfg = get_llm_config()
 
-    if not api_key:
+    if not cfg.api_key and cfg.provider != "ollama":
         # 未配置 API Key 时返回 None，各节点自行降级处理
         return None  # type: ignore
 
-    timeout = float(os.getenv("GLM_TIMEOUT", "90"))
+    effective_temp = temperature if temperature is not None else cfg.temperature
 
     return ChatOpenAI(
-        model=model,
-        api_key=api_key,
-        base_url=base_url,
-        temperature=temperature,
+        model=cfg.model,
+        api_key=cfg.api_key or "ollama",   # Ollama 要求非空字符串
+        base_url=cfg.base_url,
+        temperature=effective_temp,
         streaming=True,       # 全局开启流式，SSE 端点需要
-        timeout=timeout,
+        timeout=cfg.timeout,
         max_retries=2,
     )

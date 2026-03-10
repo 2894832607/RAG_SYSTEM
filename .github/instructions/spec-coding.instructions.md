@@ -1,7 +1,5 @@
 ---
-description: >
-Spec Coding 规则：所有 AI 辅助编码必须先对齐 specs/ 目录中的规范文档，
-再生成或修改代码。适用于本项目所有模块。
+description: "Spec Coding 规则：所有 AI 辅助编码必须先对齐 specs/ 目录中的规范文档，再生成或修改代码。适用于本项目所有模块。"
 applyTo: "**"
 ---
 

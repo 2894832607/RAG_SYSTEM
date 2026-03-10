@@ -1,6 +1,6 @@
 import httpx
 
-from app.modules.generation import DiffusionClient
+from app.modules.generation import CogViewClient
 from app.modules.prompt import PromptEnhancer
 from app.modules.retriever import Retriever
 from app.schemas.requests import CallbackBody, CallbackPayload, GenerationRequest, SimpleGenerationResponse
@@ -8,12 +8,29 @@ from app.schemas.requests import CallbackBody, CallbackPayload, GenerationReques
 
 def generate_once(source_text: str) -> SimpleGenerationResponse:
     retriever = Retriever()
-    knowledge = retriever.fetch(source_text)
-    enriched_prompt = PromptEnhancer().enrich(source_text, knowledge)
-    image_url = DiffusionClient().generate(enriched_prompt)
+
+    # 混合检索：自动判断精准/模糊模式
+    result = retriever.smart_retrieve(source_text)
+    poems = result.poems
+
+    # 将召回诗词格式化为知识块列表
+    knowledge_blocks = [p.to_knowledge_block() for p in poems]
+
+    # 取相似度最高的一首作为展示用 retrievedText
+    best = poems[0] if poems else None
+    retrieved_display = (
+        f"【{best.dynasty}·{best.author}·《{best.title}》】\n{best.original_poem}"
+        if best else source_text
+    )
+
+    # PE 增强，返回正向 + 负向两段提示词
+    positive_prompt, negative_prompt = PromptEnhancer().enrich(source_text, knowledge_blocks)
+
+    image_url = CogViewClient().generate(positive_prompt, negative_prompt)
     return SimpleGenerationResponse(
-        retrievedText=knowledge[0] if knowledge else source_text,
-        enhancedPrompt=enriched_prompt,
+        retrievedText=retrieved_display,
+        enhancedPrompt=positive_prompt,
+        negativePrompt=negative_prompt,
         imageUrl=image_url,
     )
 
@@ -24,6 +41,7 @@ def run_generation(request: GenerationRequest) -> None:
         payload = CallbackPayload(
             retrievedText=result.retrievedText,
             enhancedPrompt=result.enhancedPrompt,
+            negativePrompt=result.negativePrompt,
             imageUrl=result.imageUrl
         )
         send_callback(

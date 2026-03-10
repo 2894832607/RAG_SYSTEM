@@ -33,3 +33,32 @@ target/
 .env.*
 backend/local-env.ps1
 ai-service/local-env.ps1
+
+# Large raw data files (exceed GitHub 100MB limit)
+rag数据初步资源/
+data/chromadb/
+ai-service/data/chromadb/
+
+# Large binary / model files (anywhere in project)
+*.pth
+*.pt
+*.bin
+*.onnx
+*.pkl
+*.h5
+
+# Large archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Large database files
+*.sqlite3
+*.db
+
+# Large text data dumps
+*.sql
+gushiwen.json

@@ -4,7 +4,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $python = Join-Path $root '.venv\Scripts\python.exe'
 $backendEnvFile = Join-Path $root 'backend\local-env.ps1'
 $aiEnvFile = Join-Path $root 'ai-service\local-env.ps1'
-$frontendUrl = 'http://127.0.0.1:5173'
+$frontendUrl = 'http://localhost:5173'
 $backendHealthUrl = 'http://127.0.0.1:8080/actuator/health'
 $aiHealthUrl = 'http://127.0.0.1:8000/ai/health'
 
@@ -28,7 +28,7 @@ function Ensure-MySqlServiceRunning {
 
   if ($service.Status -eq 'Running') {
     Write-Host "MySQL service is already running: $($service.Name)"
-    return
+    return                                                                                                                                                                                                                                                                  
   }
 
   # 先尝试普通启动，如果权限不足则自动提权
@@ -132,9 +132,17 @@ if (Test-Path $aiEnvFile) {
 }
 
 Ensure-MySqlServiceRunning
+
+# 彻底清理旧的 java / python 进程，避免端口占用竞争
+Write-Host "Cleaning up old service processes..."
+Get-Process java -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Get-Process python* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+
 Ensure-PortFree -Port 8000
 Ensure-PortFree -Port 8080
 Ensure-PortFree -Port 5173
+Start-Sleep -Seconds 1
 
 Write-Host "[1/3] Starting AI service on 8000..."
 $aiStartCmd = if (Test-Path $aiEnvFile) {
@@ -172,19 +180,21 @@ Write-Host "Note: Backend requires MySQL with schema in backend/sql/schema.sql"
 
 Write-Host "Waiting for services to be ready (backend may take ~60s)..."
 $aiCode = Wait-HttpReady -Url $aiHealthUrl -TimeoutSeconds 60
-# 后端 /actuator/health 在DB连接异常时返回503但服务本身可用，所以改用根路径或登录接口探测
-$backendCode = Wait-HttpReady -Url 'http://127.0.0.1:8080/api/v1/auth/login' -TimeoutSeconds 90
+$backendCode = Wait-HttpReady -Url 'http://127.0.0.1:8080/actuator/health' -TimeoutSeconds 90
 $frontendCode = Wait-HttpReady -Url $frontendUrl -TimeoutSeconds 30
 Write-Host "- AI      $aiHealthUrl -> $aiCode"
 Write-Host "- Backend $backendHealthUrl -> $backendCode"
 Write-Host "- Frontend $frontendUrl -> $frontendCode"
 
-if ($backendCode -ne 'TIMEOUT' -and $frontendCode -ne 'TIMEOUT') {
-  Write-Host "All services ready! Opening browser..."
+if ($frontendCode -ne 'TIMEOUT') {
+  if ($backendCode -eq 'TIMEOUT') {
+    Write-Host "WARNING: Backend may not be ready yet. Check the backend startup window."
+  }
+  Write-Host "Opening browser..."
   Start-Process $frontendUrl
   Write-Host "Browser opened: $frontendUrl"
 } else {
-  Write-Host "WARNING: Some services are not healthy. Check the startup windows."
-  Write-Host "Backend: $backendCode  Frontend: $frontendCode"
-  Write-Host "You can still open the browser manually when ready: $frontendUrl"
+  Write-Host "WARNING: Frontend is not ready. Check the startup windows."
+  Write-Host "AI: $aiCode  Backend: $backendCode  Frontend: $frontendCode"
+  Write-Host "Open manually when ready: $frontendUrl"
 }

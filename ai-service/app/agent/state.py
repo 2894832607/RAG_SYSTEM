@@ -24,8 +24,12 @@ class AgentState(MessagesState):
     # ── RAG 检索结果 ────────────────────────────────────────────
     retrieved_poems: Annotated[list[dict], "ChromaDB 召回的诗词列表"] = []
 
+    # ── 待选择的候选诗词（模糊检索时返回多首供用户选择）──────────
+    pending_poems: Annotated[list[dict], "模糊检索候选列表，等待用户选择"] = []
+
     # ── 提示词增强结果 ──────────────────────────────────────────
     enhanced_prompt: Optional[str] = None
+    negative_prompt: Optional[str] = None
 
     # ── 图像生成结果 ────────────────────────────────────────────
     image_url: Optional[str] = None

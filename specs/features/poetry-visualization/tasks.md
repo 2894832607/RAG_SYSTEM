@@ -1,122 +1,69 @@
-# Tasks: 诗词可视化生成
+# Tasks: 诗词可视化生成系统 (Interface & Core Logic Alignment)
 
-> **Plan**: [specs/features/poetry-visualization/plan.md](plan.md)  
-> **Spec**: [specs/features/poetry-visualization.spec.md](../poetry-visualization.spec.md)  
-> **Status**: In Progress（0/8 任务完成）
+> Status: IN_PROGRESS
+> Reference Plan: [plan.md](../../master/plan.md)
+> Reference Spec: [poetry-visualization.spec.md](../poetry-visualization.spec.md)
 
----
+## Phase 1: Setup & Environment Initialization
+项目基础依赖、环境变量以及文档契约的初始化。
 
-## 任务清单
+- [ ] T001 [P] 导出后端及 AI 服务的 OpenAPI Json 至 `specs/architecture/contracts/`
+- [ ] T002 更新配置文件以支持 `CALLBACK_TOKEN` 的全局校验（Backend & AI Service）
+- [ ] T003 配置 `backend/src/main/resources/application-dev.yml` 与本地环境变量对齐
 
-### T001 — 对齐 ErrorResponse schema [P0]
-- **目标**: 确保 `GlobalExceptionHandler` 的返回格式与 `backend.yaml` 中 `ErrorResponse` schema 完全一致
-- **文件**: `backend/src/main/java/com/example/poetryvisualization/controller/GlobalExceptionHandler.java`
-- **实现范围**:
-  - 返回字段包含 `code / message / timestamp`
-  - timestamp 使用 ISO-8601 格式
-  - 404 场景由 `ResourceNotFoundException` 触发，返回 code=404
-- **验收标准**: 调用不存在的 taskId，返回 `{"code":404,"message":"...","timestamp":"..."}`
-- **依赖**: 无
-- **状态**: - [ ]
+## Phase 2: Foundational Tasks (Prerequisites)
+核心组件的基石任务，必须在业务逻辑前完成。
 
----
+- [ ] T004 在 Backend 项目中实现 `X-Callback-Token` 拦截器 `backend/src/main/java/com/poetry/interceptor/CallbackInterceptor.java`
+- [ ] T005 定义通用的 `ApiResponse<T>` 泛型类并在控制层全面应用 `backend/src/main/java/com/poetry/dto/ApiResponse.java`
 
-### T002 — 补充 ResourceNotFoundException [P0]
-- **目标**: 创建统一的 404 异常类，供 Service 层抛出
-- **文件**: `backend/src/main/java/com/example/poetryvisualization/exception/ResourceNotFoundException.java`
-- **实现范围**:
-  - 继承 `RuntimeException`
-  - 构造函数接收 `String message`
-- **验收标准**: `TaskDispatchService.findByTaskId()` 找不到记录时抛此异常，Controller 返回 HTTP 404
-- **依赖**: T001
-- **状态**: - [ ]
+## Phase 3: User Story 4 - 用户注册与登录 [US4]
+**Story Goal**: 用户在获得 JWT Token 后才能访问其他功能。
+**Independent Test Criteria**: 注册 -> 登录 -> 获取 Token -> 访问受保护接口返回 200。
 
----
+- [ ] T006 [US4] 创建 `User` 实体与 MyBatis-Plus 的 Mapper 映射 `backend/src/main/java/com/poetry/mapper/UserMapper.java`
+- [ ] T007 [US4] 实现 JWT Token 的生成与解析工具类 `backend/src/main/java/com/poetry/util/JwtUtil.java`
+- [ ] T008 [US4] 在 `AuthController` 中实现 `/api/v1/auth/register` 与 `/api/v1/auth/login`
+- [ ] T009 [P] [US4] 在 Frontend 中更新 `src/services/authService.ts` 处理拦截器逻辑自动附加 Token
 
-### T003 — AI Service 回调失败兜底 [P1]
-- **目标**: pipeline.py 中 callback 请求失败时记录日志，不抛未捕获异常
-- **文件**: `ai-service/app/modules/pipeline.py`
-- **实现范围**:
-  - callback POST 失败（网络异常/超时）捕获 Exception
-  - 记录 `logger.error("Callback failed for taskId={}: {}", taskId, e)`
-  - 不向外传播异常
-- **验收标准**: 将 callbackUrl 改为无效地址，`run_pipeline_once.py` 不崩溃，日志有错误记录
-- **依赖**: 无 [P]（可与 T001 并行）
-- **状态**: - [ ]
+## Phase 4: User Story 3 - 核心流程：诗句分镜多图生成 [US3]
+**Story Goal**: 核心路径，从诗句输入到多张分镜图异步回传展示。
+**Independent Test Criteria**: Frontend 提交诗句，Backend 创建任务，AI Service 后台完成并回调 Backend 更新状态。
 
----
+- [ ] T010 [US3] 实现后端任务创建接口 `POST /api/v1/poetry/visualize` 并将 PENDING 状态入库
+- [ ] T011 [US3] 更新 AI Service 架构以支持异步调用与其对应的 `tasks.py` 后台任务管理器
+- [ ] T012 [US3] 在后端实现回调 API `POST /api/v1/poetry/callback` 并校验 Token 与任务状态更新
+- [ ] T013 [P] [US3] 前端实现 `src/services/apiService.ts` 到后端 `/api/v1/poetry/visualize` 的对接
 
-### T004 — 验证 think-stream SSE 端到端 [P1]
-- **目标**: 确认 `/api/v1/poetry/think-stream` → `/ai/api/v1/generate/think-stream` 代理链路正常
-- **文件**: `backend/src/main/java/com/example/poetryvisualization/controller/PoetryVisualizationController.java`
-- **实现范围**:
-  - 确认 thinkUrl 替换逻辑正确（async → think-stream）
-  - 确认 SseEmitter 超时 120s
-  - 确认异常时 emitter 正确 completeWithError
-- **验收标准**: curl 调用 think-stream 端点能收到 SSE 事件
-- **依赖**: 无 [P]
-- **状态**: - [ ]
+## Phase 5: User Story 5 - 历史任务记录浏览 [US5]
+**Story Goal**: 用户能够按序浏览本人之前的可视化生成作品。
+**Independent Test Criteria**: 登录用户在个人中心可以看到之前生成的历史任务卡片。
 
----
+- [ ] T014 [US5] 后端实现分页获取当前用户任务记录的逻辑 `GET /api/v1/poetry/history`
+- [ ] T015 [P] [US5] 前端实现 `src/views/HistoryView.vue` 和 `src/components/TaskCard.vue`
 
-### T005 — Backend 环境变量配置检查 [P0]
-- **目标**: 确认所有必填环境变量在 application.yml 中有对应配置项且不硬编码
-- **文件**: `backend/src/main/resources/application.yml`
-- **实现范围**:
-  - `AI_SERVICE_URL` → `ai.service.url`
-  - `AI_CALLBACK_URL` → `ai.callback.url`
-  - `AI_CALLBACK_TOKEN` → `ai.callback.token`
-  - 确认无默认硬编码 token 值
-- **验收标准**: 未设置 `AI_CALLBACK_TOKEN` 时启动报错或有明确警告
-- **依赖**: 无 [P]
-- **状态**: - [ ]
+## Phase 6: Polish & Cross-Cutting Concerns
+- [ ] T016 统一全系统的任务状态枚举为 `PENDING/PROCESSING/COMPLETED/FAILED`
+- [ ] T017 [P] 移除全项目中散落的硬编码 URL，确保 `ai-service` 的 `callbackUrl` 由环境变量动态注入
 
----
-
-### T006 — AI Service 任务状态推进到 PROCESSING [P1]
-- **目标**: AI Service 接收任务后，立即回调 Backend 将状态从 PENDING 改为 PROCESSING
-- **文件**: `ai-service/app/modules/pipeline.py`
-- **实现范围**:
-  - 在 pipeline 开始执行时，POST callback 设置 `status=3`（或 Backend 增加 PROCESSING 回调协议）
-  - 或：Backend 在发出 AI 请求后主动将状态改为 PROCESSING
-- **验收标准**: 提交任务后，状态从 PENDING 变为 PROCESSING，再变为 COMPLETED/FAILED
-- **依赖**: T001, T002
-- **状态**: - [ ]
-
----
-
-### T007 — Frontend 轮询四状态 UI [P1]
-- **目标**: 前端轮询时根据 taskStatus 显示不同 UI 状态
-- **文件**: `frontend/src/views/GenerateView.vue`（或对应组件）
-- **实现范围**:
-  - PENDING：显示"等待中..."
-  - PROCESSING：显示"AI 处理中..."（可加进度动画）
-  - COMPLETED：显示生成图像
-  - FAILED：显示 errorMessage
-- **验收标准**: 手动模拟四种状态，UI 能正确切换
-- **依赖**: T001
-- **状态**: - [ ]
-
----
-
-### T008 — 更新 Feature Spec 验收标准 [P2]
-- **目标**: T001~T007 完成后，将 spec.md 中对应的 `- [ ]` 改为 `- [x]`
-- **文件**: `specs/features/poetry-visualization.spec.md`
-- **实现范围**: 逐条对照已实现的功能，标记完成
-- **验收标准**: spec.md 验收标准的完成率 ≥ 80%
-- **依赖**: T001~T007
-- **状态**: - [ ]
-
----
-
-## 实现顺序
-
-```
-T001 → T002 → T006 → T008
-  ↘ T003 [P]
-  ↘ T004 [P]
-  ↘ T005 [P]
-         → T007 → T008
+## Dependency Graph
+```mermaid
+graph TD
+    T001 --> T004
+    T001 --> T005
+    T004 --> T006
+    T006 --> T007
+    T007 --> T008
+    T008 --> T009
+    T008 --> T010
+    T010 --> T011
+    T010 --> T012
+    T012 --> T013
+    T013 --> T014
+    T014 --> T015
 ```
 
-> 标注 [P] 的任务可与前序任务并行执行。
+## Implementation Strategy
+- **MVP Logic**: 绝大多数工作量集中在异步回调与认证对接，这是解决当前“通信失败”风险的关键点。
+- **Contract First**: 所有 Controller 修改必须先读 `backend.yaml` 原定义。
+- **Security**: 确保 T004 的回调 Token 逻辑被优先实现，防止 AI 结果被非法注入。

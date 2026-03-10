@@ -5,8 +5,18 @@
       <p>查看您提交过的所有诗词可视化任务</p>
     </div>
 
+    <!-- Loading State -->
+    <div class="empty-state" v-if="loading">
+      <p>加载中…</p>
+    </div>
+
+    <!-- Error State -->
+    <div class="empty-state" v-else-if="error">
+      <p style="color: var(--danger)">{{ error }}</p>
+    </div>
+
     <!-- Empty State -->
-    <div class="empty-state" v-if="taskStore.tasks.length === 0">
+    <div class="empty-state" v-else-if="historyTasks.length === 0">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.2">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <circle cx="8.5" cy="8.5" r="1.5" />
@@ -26,7 +36,7 @@
     <!-- Task Grid -->
     <div class="task-grid" v-else>
       <div
-        v-for="task in taskStore.tasks"
+        v-for="task in historyTasks"
         :key="task.taskId"
         class="task-card"
         @click="handleView(task.taskId)"
@@ -47,8 +57,8 @@
         <div class="task-info">
           <p class="task-poem">{{ task.originalPoem }}</p>
           <div class="task-meta">
-            <span class="status-tag" :class="statusClass(task.status)">
-              {{ statusLabel(task.status) }}
+            <span class="status-tag" :class="statusClass(task.taskStatus)">
+              {{ statusLabel(task.taskStatus) }}
             </span>
             <span class="task-time">{{ formatTime(task.createdAt) }}</span>
           </div>
@@ -59,19 +69,42 @@
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTaskStore } from '../stores/task'
+import { fetchHistory } from '../services/api'
 
-const taskStore = useTaskStore()
+interface HistoryTask {
+  taskId: string
+  originalPoem: string
+  resultImageUrl: string
+  taskStatus: string
+  createdAt: string
+}
+
 const router = useRouter()
+const historyTasks = ref<HistoryTask[]>([])
+const loading = ref(false)
+const error = ref('')
 
-const handleView = (taskId: string) => {
-  taskStore.selectTask(taskId)
+onMounted(async () => {
+  loading.value = true
+  try {
+    const res = await fetchHistory()
+    historyTasks.value = res.data?.data?.items || []
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '加载历史失败'
+    error.value = msg
+  } finally {
+    loading.value = false
+  }
+})
+
+const handleView = (_taskId: string) => {
   router.push('/')
 }
 
 const statusClass = (s: string) => ({
-  'tag-pending': s === 'PENDING' || s === 'RUNNING',
+  'tag-pending': s === 'PENDING',
   'tag-success': s === 'COMPLETED',
   'tag-error': s === 'FAILED'
 })
@@ -79,15 +112,16 @@ const statusClass = (s: string) => ({
 const statusLabel = (s: string) => {
   const map: Record<string, string> = {
     PENDING: '排队中',
-    RUNNING: '生成中',
     COMPLETED: '已完成',
     FAILED: '失败'
   }
   return map[s] || s
 }
 
-const formatTime = (ts: number) => {
-  const d = new Date(ts)
+const formatTime = (iso: string) => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return iso.slice(0, 16).replace('T', ' ')
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
