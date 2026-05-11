@@ -1,0 +1,57 @@
+# Copy this file to local-env.ps1 and fill your own values.
+# See specs/001-model-api-config/quickstart.md for full switching guide.
+
+# ── 文本 LLM 配置（新变量，推荐使用）─────────────────────────────────────
+# LLM_PROVIDER: glm | doubao | openai | qwen | ollama | custom
+# 设定后 LLM_BASE_URL 会自动使用对应预设端点，无需手动填写。
+$env:LLM_PROVIDER = 'glm'
+$env:LLM_API_KEY  = 'your_api_key_here'
+$env:LLM_MODEL    = 'glm-4-flash'
+# $env:LLM_BASE_URL    = ''        # 仅 custom 或覆盖预设时需要填写
+# $env:LLM_TEMPERATURE = '0.7'
+# $env:LLM_TIMEOUT     = '90'
+
+# ── 图像生成配置（字节 Seedream，可选，默认继承 LLM 配置）─────────────────
+# IMAGE_PROVIDER: seedream（默认）| cogview | local_sdxl | disabled
+# $env:IMAGE_PROVIDER = 'seedream'
+# $env:IMAGE_API_KEY  = ''         # 留空时使用 LLM_API_KEY
+# $env:IMAGE_BASE_URL = ''         # 留空时使用 LLM_BASE_URL
+# $env:IMAGE_MODEL    = 'doubao-seedream-5-0-260128'
+# $env:COGVIEW_SIZE   = '1024x1024'  # 图像尺寸：1024x1024 / 768x768 / 512x512（越小越快）
+# $env:COGVIEW_TIMEOUT= '180'        # 超时秒数（默认 180s，拥堵时建议 240-300s）
+
+# ── 视频生成配置（字节 Seedance，可选，默认继承图像配置）────────────────────
+# VIDEO_MODEL: 字节 Seedance 模型名称
+# VIDEO_TIMEOUT: 最长等待秒数（默认 480s，拥堵时建议 600s）
+# VIDEO_POLL_INTERVAL: 轮询间隔秒数（默认 5）
+# VIDEO_IMAGE_STRENGTH: 帧参考强度 0.0-1.0（默认 0.65）
+# $env:VIDEO_MODEL          = 'seedance-1-lite'   # ✅ 必填（若需要视频功能）
+# $env:VIDEO_API_KEY        = ''                  # 留空时继承 IMAGE_API_KEY
+# $env:VIDEO_BASE_URL       = ''                  # 留空时继承 IMAGE_BASE_URL
+# $env:VIDEO_TIMEOUT        = '480'
+# $env:VIDEO_POLL_INTERVAL  = '5'
+# $env:VIDEO_IMAGE_STRENGTH = '0.65'
+
+# ── 切换示例：豆包 ────────────────────────────────────────────────────────
+# $env:LLM_PROVIDER = 'doubao'
+# $env:LLM_API_KEY  = 'your_ark_api_key'
+# $env:LLM_MODEL    = 'ep-xxxxxxxxxxxxxxxxxx'
+
+# ── 切换示例：本地 Ollama ─────────────────────────────────────────────────
+# $env:LLM_PROVIDER = 'ollama'
+# $env:LLM_MODEL    = 'llama3'
+# (LLM_API_KEY 留空即可)
+
+# ── Redis 缓存配置（可选，默认连接本地 Redis）──────────────────────────────
+# 启动本地 Redis（Docker）：docker run -d -p 6379:6379 redis:7-alpine
+# 未部署 Redis 时服务仍可正常运行，只是不使用缓存
+# $env:REDIS_HOST     = 'localhost'    # Redis 地址
+# $env:REDIS_PORT     = '6379'         # Redis 端口
+# $env:REDIS_DB       = '0'            # Redis 数据库索引
+# $env:REDIS_PASSWORD = ''             # Redis 密码（无密码时留空）
+
+# ── [DEPRECATED] 旧版 GLM 变量（向后兼容，仍有效，推荐迁移到新变量）──────
+# $env:GLM_API_KEY  = 'your_glm_api_key_here'
+# $env:GLM_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
+# $env:GLM_MODEL    = 'glm-4-flash'
+# $env:GLM_TIMEOUT  = '90'

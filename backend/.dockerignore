@@ -1,0 +1,31 @@
+# backend/.dockerignore — 减少构建上下文传输体积
+
+# Maven 本地仓库（最大！不要发送进 Docker）
+.m2/
+
+# 已构建产物（由 Docker 内部构建）
+target/
+
+# 开发环境配置（含密钥，绝对不发送）
+local-env.ps1
+local-env.ps1.example
+*.env
+.env*
+
+# IDE 文件
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+
+# Git 历史
+.git/
+.gitignore
+
+# 日志
+*.log
+logs/
+
+# 临时文件
+tmp/

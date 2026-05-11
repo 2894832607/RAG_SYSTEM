@@ -1,0 +1,304 @@
+openapi: 3.1.0
+info:
+  title: Poetry RAG — Backend API
+  version: "0.1.0"
+  description: |
+    Spring Boot 业务层对外暴露的 REST 接口。
+    负责任务创建、状态查询、AI 回调接收和 SSE 思考流代理。
+  contact:
+    name: Poetry RAG Team
+
+servers:
+  - url: http://localhost:8080
+    description: 本地开发
+
+tags:
+  - name: poetry
+    description: 诗句可视化核心流程
+  - name: auth
+    description: 用户注册 / 登录
+
+paths:
+  # ── 诗词可视化 ──────────────────────────────────────────────────────────────
+  /api/v1/poetry/visualize:
+    post:
+      summary: 提交诗句，创建可视化任务
+      operationId: submitPoem
+      tags: [poetry]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PoemTaskRequest'
+            example:
+              poemText: "床前明月光，疑是地上霜"
+      responses:
+        "200":
+          description: 任务创建成功，返回 taskId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 200
+                message: "Task submitted successfully"
+                data:
+                  taskId: "abc123-uuid"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/poetry/task/{taskId}:
+    get:
+      summary: 查询任务状态与结果（前端轮询）
+      operationId: getTask
+      tags: [poetry]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: 任务唯一标识
+      responses:
+        "200":
+          description: 任务详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskDetail'
+        "404":
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/poetry/callback:
+    post:
+      summary: AI 微服务回调，更新任务结果
+      operationId: handleCallback
+      tags: [poetry]
+      security:
+        - callbackToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PoetryCallbackRequest'
+      responses:
+        "200":
+          description: 回调处理成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        "401":
+          description: 无效的 X-Callback-Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/poetry/think-stream:
+    post:
+      summary: SSE — GLM 思考流代理（后端 → 前端）
+      operationId: thinkStream
+      tags: [poetry]
+      description: |
+        后端作为 SSE 代理，将 AI 微服务 `/ai/api/v1/generate/think-stream`
+        的推流实时转发给浏览器，绕过 CORS 限制。
+        每个 SSE 事件：`data: {"text":"..."}\n\n`
+        结束事件：`data: [DONE]\n\n`
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PoemTaskRequest'
+      responses:
+        "200":
+          description: Server-Sent Events 流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE 格式文本流
+
+  # ── 认证 ────────────────────────────────────────────────────────────────────
+  /api/v1/auth/register:
+    post:
+      summary: 用户注册
+      operationId: register
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        "200":
+          $ref: '#/components/responses/AuthSuccess'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/auth/login:
+    post:
+      summary: 用户登录，返回 JWT
+      operationId: login
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        "200":
+          $ref: '#/components/responses/AuthSuccess'
+        "401":
+          description: 用户名或密码错误
+
+# ── Components ──────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    callbackToken:
+      type: apiKey
+      in: header
+      name: X-Callback-Token
+
+  schemas:
+    PoemTaskRequest:
+      type: object
+      required: [poemText]
+      properties:
+        poemText:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: 原始诗句文本
+          example: "床前明月光，疑是地上霜"
+
+    AuthRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+
+    TaskDetail:
+      type: object
+      properties:
+        taskId:
+          type: string
+        originalPoem:
+          type: string
+        retrievedText:
+          type: string
+          description: RAG 检索到的相关诗文
+        enhancedPrompt:
+          type: string
+          description: 增强后的图像生成 Prompt
+        resultImageUrl:
+          type: string
+          format: uri
+          description: 生成图像的 URL（完成后非空）
+        taskStatus:
+          type: string
+          enum: [PENDING, PROCESSING, COMPLETED, FAILED]
+        errorMessage:
+          type: string
+
+    PoetryCallbackRequest:
+      type: object
+      required: [taskId, status]
+      properties:
+        taskId:
+          type: string
+        status:
+          type: integer
+          enum: [1, 2]
+          description: "1=成功 2=失败"
+        errorMessage:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          nullable: true
+          properties:
+            retrievedText:
+              type: string
+            enhancedPrompt:
+              type: string
+            imageUrl:
+              type: string
+              format: uri
+
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 200
+        message:
+          type: string
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: 请求参数校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    AuthSuccess:
+      description: 认证成功，返回 token
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ApiResponse'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      userId:
+                        type: integer

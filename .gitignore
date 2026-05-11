@@ -1,0 +1,39 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.venv/
+.venv311/
+venv/
+
+# Node / Frontend
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+
+# Logs
+*.log
+
+# Local runtime data
+.local/
+
+# Env files
+.env
+.env.*
+backend/local-env.ps1
+ai-service/local-env.ps1

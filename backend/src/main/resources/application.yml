@@ -1,0 +1,42 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: poetry-rag-backend
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/poetry_rag?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null   # JSON 响应自动忽略 null 字段
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true                              # 下划线 → 驼峰自动映射
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl           # 开发期打印 SQL，上线可删
+  global-config:
+    db-config:
+      id-type: auto
+      table-underline: true
+
+# AI 微服务地址
+ai:
+  service:
+    base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:8000}
+    url: ${AI_SERVICE_URL:http://127.0.0.1:8000/ai/api/v1/generate/async}
+    callback-url: ${AI_CALLBACK_URL:http://127.0.0.1:${server.port}/api/v1/poetry/callback}
+    callback-token: ${AI_CALLBACK_TOKEN:poetry-callback-token-change-me}
+
+app:
+  security:
+    token-ttl-minutes: ${AUTH_TOKEN_TTL_MINUTES:720}
+    cors:
+      allowed-origins:
+        - http://localhost:5173
+        - http://127.0.0.1:5173
+        - ${WEB_ORIGIN:http://localhost:5173}
